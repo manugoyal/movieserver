@@ -11,6 +11,7 @@ import (
         "flag"
 	"io"
 	"time"
+	"strings"
 )
 
 
@@ -21,6 +22,7 @@ const (
 var (
         moviePath = flag.String("movie-path", "/main/movies", "The path of the movies directory")
         movieNames []string
+	allowedIP = map[string]bool{"[::1]": true, "98.236.150.191": true, "174.51.196.185": true}
 )
 
 // Walks through the moviePath directory and appends any movie file
@@ -80,9 +82,23 @@ const (
 	fetchPath = "/fetch/"
 )
 
+// Makes sure that the request's ip is allowed. Sends an error message
+// if it isn't. Returns true if it is allowed, false if it isn't
+func checkAccess(w http.ResponseWriter, r *http.Request) bool {
+	ipstr := r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")]
+	if _, ok := allowedIP[ipstr]; !ok {
+		http.Error(w, fmt.Sprint("You do not have access to this site"), http.StatusServiceUnavailable)
+		return false
+	}
+	return true
+}
+
 // Reindexes the movie directory and serves index template with the
 // movie names
 func mainHandler(w http.ResponseWriter, r *http.Request) {
+	if !checkAccess(w, r) {
+		return
+	}
         log.Print("Indexing movie directory")
 	movieNames = make([]string, 0)
         err := filepath.Walk(*moviePath, movieWalkFn)
@@ -94,11 +110,17 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 
 // Serves the favicon
 func faviconHandler(w http.ResponseWriter, r *http.Request) {
+	if !checkAccess(w, r) {
+		return
+	}
         http.ServeFile(w, r, imagePath + "favicon.ico")
 }
 
 // Serves the specified file moviePath should not be in the url
 func fetchHandler(w http.ResponseWriter, r *http.Request) {
+	if !checkAccess(w, r) {
+		return
+	}
 	filename := r.URL.Path[len(fetchPath):]
 	log.Printf("Fetching file: %s", *moviePath + filename)
 	f, err := os.Open(*moviePath + filename)
