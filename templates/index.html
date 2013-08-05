@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>
+            Movie Server
+        </title>
+    </head>
+    <body>
+      <table border="1">
+   
+        <tr>
+          <th> Names </th>
+        </tr>
+        {{range .}}<tr>
+        <td>{{.}}</td>
+        </tr> {{end}}
+    </body>
+</html>
