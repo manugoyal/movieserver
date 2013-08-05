@@ -8,15 +8,16 @@ import (
 	"html/template"
 	"path/filepath"
 	"os"
+	"flag"
 )
 
 
 /* Utility stuff */
 const (
         port = ":8080"
-	moviePath = "/Volumes/Data/Movies"
 )
-var movieNames []string = make([]string, 0)
+var moviePath = flag.String("movie-path", "/main/Movies", "The path of the movies directory")
+var movieNames = make([]string, 0)
 
 // Walks through the moviePath directory and appends any movie file
 // names to movieNames
@@ -77,7 +78,6 @@ const (
 
 // Just serves the index template with the movie names
 func mainHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Print(movieNames)
 	runTemplate("index", w, movieNames)
 }
 
@@ -88,6 +88,7 @@ func faviconHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	flag.Parse()
 	log.Print("Fetching html templates")
 	err := fetchTemplates("index")
 	if err != nil {
@@ -95,7 +96,7 @@ func main() {
 	}
 
 	log.Print("Indexing movie directory")
-	err = filepath.Walk(moviePath, movieWalkFn)
+	err = filepath.Walk(*moviePath, movieWalkFn)
 	if err != nil {
 		log.Fatal(err)
 	}
