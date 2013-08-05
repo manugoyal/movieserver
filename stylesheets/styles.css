@@ -1,0 +1,13 @@
+body {
+  background-color: #fffffa;
+}
+.container {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+th {
+  text-align: center;
+}
+form.download-button {
+  display: inline-block;
+}

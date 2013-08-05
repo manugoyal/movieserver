@@ -1,18 +1,38 @@
 <!DOCTYPE html>
 <html>
-    <head>
-        <title>
-            Movie Server
-        </title>
-    </head>
-    <body>
-      <table border="1">
-   
-        <tr>
-          <th> Names </th>
-        </tr>
-        {{range .}}<tr>
-        <td><a href="fetch/{{.}}" target="_blank">{{.}}</a></td>
-        </tr> {{end}}
-    </body>
+  <head>
+    <!-- RequireJS -->
+    <script data-main="js/startup" src="js/require.js"></script>
+
+    <!-- CSS -->
+    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.no-icons.min.css" rel="stylesheet" />
+    <link href="//netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.css" rel="stylesheet" />
+    <link href="../bootstrap/css/bootstrap.min.css" rel="stylesheet" />
+
+    <link href="stylesheets/styles.css" rel="stylesheet" />
+    <title>
+      Movie Server
+    </title>
+  </head>
+
+  <body>
+    <div class="container">
+      <div class="row">
+        <table border="1">
+
+          <tr>
+            <th> Movies </th>
+          </tr>
+          {{range .}}<tr>
+            <td>
+              <form class="download-button" method="get" action="fetch/{{.}}">
+                <button type="submit" class="btn btn-link btn-sm"> {{.}} </button>
+              </form>
+            </td>
+          </tr>{{end}}
+
+        </table>
+      </div>
+    </div>
+  </body>
 </html>
