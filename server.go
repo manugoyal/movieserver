@@ -20,7 +20,7 @@ const (
 )
 var (
         moviePath = flag.String("movie-path", "/main/movies", "The path of the movies directory")
-        movieNames = make([]string, 0)
+        movieNames []string
 )
 
 // Walks through the moviePath directory and appends any movie file
@@ -80,8 +80,15 @@ const (
 	fetchPath = "/fetch/"
 )
 
-// Just serves the index template with the movie names
+// Reindexes the movie directory and serves index template with the
+// movie names
 func mainHandler(w http.ResponseWriter, r *http.Request) {
+        log.Print("Indexing movie directory")
+	movieNames = make([]string, 0)
+        err := filepath.Walk(*moviePath, movieWalkFn)
+        if err != nil {
+                log.Fatal(err)
+        }
         runTemplate("index", w, movieNames)
 }
 
@@ -100,9 +107,8 @@ func fetchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rs := io.ReadSeeker(f)
-	w.Header().Set("Content-Type", "application/octet-stream")
 	http.ServeContent(w, r, filename, time.Time{}, rs)
-	log.Printf("Served file: %s", filename)
+	log.Printf("Served file: %s", *moviePath + filename)
 }
 
 func main() {
@@ -110,13 +116,6 @@ func main() {
 	*moviePath = filepath.Clean(*moviePath) + "/"
         log.Print("Fetching html templates")
         err := fetchTemplates("index")
-        if err != nil {
-                log.Fatal(err)
-        }
-
-        log.Print("Indexing movie directory")
-
-        err = filepath.Walk(*moviePath, movieWalkFn)
         if err != nil {
                 log.Fatal(err)
         }
