@@ -9,6 +9,8 @@ import (
         "path/filepath"
         "os"
         "flag"
+	"io"
+	"time"
 )
 
 
@@ -29,7 +31,7 @@ func movieWalkFn(path string, info os.FileInfo, err error) error {
         }
         if name := info.Name(); !info.IsDir() && name[0] != '.' &&
                 filepath.Ext(name) != ".srt" {
-                movieNames = append(movieNames, path)
+                movieNames = append(movieNames, path[len(*moviePath):])
         }
         return nil
 }
@@ -73,8 +75,9 @@ func runTemplate(operationName string, w http.ResponseWriter, data interface{}) 
 /* HTTP handlers */
 
 const (
-        mainPath = "/"
         imagePath = "images/"
+        mainPath = "/"
+	fetchPath = "/fetch/"
 )
 
 // Just serves the index template with the movie names
@@ -85,11 +88,26 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 // Serves the favicon
 func faviconHandler(w http.ResponseWriter, r *http.Request) {
         http.ServeFile(w, r, imagePath + "favicon.ico")
-        return
+}
+
+// Serves the specified file moviePath should not be in the url
+func fetchHandler(w http.ResponseWriter, r *http.Request) {
+	filename := r.URL.Path[len(fetchPath):]
+	log.Printf("Fetching file: %s", *moviePath + filename)
+	f, err := os.Open(*moviePath + filename)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("Could not fetch file %s", filename), http.StatusNotFound)
+		return
+	}
+	rs := io.ReadSeeker(f)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	http.ServeContent(w, r, filename, time.Time{}, rs)
+	log.Printf("Served file: %s", filename)
 }
 
 func main() {
         flag.Parse()
+	*moviePath = filepath.Clean(*moviePath) + "/"
         log.Print("Fetching html templates")
         err := fetchTemplates("index")
         if err != nil {
@@ -105,6 +123,7 @@ func main() {
 
         http.HandleFunc(mainPath, mainHandler)
         http.HandleFunc("/favicon.ico", faviconHandler)
+	http.HandleFunc(fetchPath, fetchHandler)
 
         log.Printf("Listening on port %s\n", port[1:])
         http.ListenAndServe(port, nil)
