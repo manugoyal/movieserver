@@ -5,7 +5,7 @@ package main
 import (
 	"html/template"
 	"net/http"
-	"log"
+	"github.com/golang/glog"
 	"fmt"
 )
 
@@ -37,7 +37,7 @@ func runTemplate(operationName string, w http.ResponseWriter, data interface{}) 
 		return err
 	}
 
-	log.Printf("Rendered template %s", operationName)
+	glog.V(infolevel).Infof("Rendered template %s", operationName)
 	return nil
 }
 

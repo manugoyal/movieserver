@@ -8,7 +8,7 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 	"io/ioutil"
 	"strings"
-	"log"
+	"github.com/golang/glog"
 )
 
 var (
@@ -58,7 +58,7 @@ func setupSchema() error {
 			execstmt = stmt
 		}
 		if len(execstmt) > 0 {
-			log.Printf("Executing: %s", execstmt)
+			glog.V(infolevel).Infof("Executing: %s", execstmt)
 			_, err := dbHandle.Exec(execstmt)
 			if err != nil {
 				return err
@@ -96,21 +96,21 @@ func compileSQL() error {
 
 // Closes the sql statements and the dbHandle
 func cleanupDB() {
-	log.Print("Cleaning up DB connection")
+	glog.V(infolevel).Info("Cleaning up DB connection")
 	const DBErrmsg = "Error during DB cleanup: %s"
 	var err error
 	for _, stmt := range(insertStatements) {
 		if err = stmt.Close(); err != nil {
-			log.Printf(DBErrmsg, err)
+			glog.V(infolevel).Infof(DBErrmsg, err)
 		}
 	}
 	for _, stmt := range(selectStatements) {
 		if err = stmt.Close(); err != nil {
-			log.Printf(DBErrmsg, err)
+			glog.V(infolevel).Infof(DBErrmsg, err)
 		}
 	}
 
 	if err = dbHandle.Close(); err != nil {
-		log.Printf(DBErrmsg, err)
+		glog.V(infolevel).Infof(DBErrmsg, err)
 	}
 }

@@ -2,13 +2,19 @@
 package main
 
 import (
-	"log"
+	"fmt"
+	"github.com/golang/glog"
 	"net/http"
 	"path/filepath"
 	"flag"
 	"os"
 	"runtime"
 	"os/signal"
+)
+
+const (
+	// The verbosity level necessary for info statements to be printed
+	infolevel = 1
 )
 
 // Looks through all the gopaths to find a possible location for the
@@ -26,10 +32,11 @@ func srcdir() string {
 	return movieserverExt
 }
 
-// Calls all the cleanup functions
+// Calls all the cleanup functions and flush the log
 func cleanupServer() {
 	cleanupDB()
 	cleanupHeartbeat()
+	glog.Flush()
 }
 
 // Monitors for interrupt signals and, upon getting one, calls
@@ -39,23 +46,41 @@ func interruptHandler() {
 	signal.Notify(interruptNotifier, os.Interrupt)
 	go func() {
 		select {
-		case <-interruptNotifier:
-			log.Print("Server received an interrupt: calling cleanup functions")
-			cleanupServer()
-			os.Exit(0)
+		case sig := <-interruptNotifier:
+			switch sig {
+			case os.Interrupt:
+				glog.Warning("Server received an interrupt: calling cleanup functions")
+				cleanupServer()
+				os.Exit(0)
+			}
 		}
 	}()
 }
 
 var (
 	srcPath = flag.String("src-path", srcdir(), "The path of the movieserver source directory")
-	moviePath = flag.String("movie-path", "movies", "The path of the movies directory")
-	port = flag.String("port", "8080", "The port to listen on")
+	moviePath = flag.String("movie-path", "", "REQUIRED: The path of the movies directory")
+	port = flag.Uint64("port", 8080, "The port to listen on")
 	refreshSchema = flag.Bool("refresh-schema", false, "If true, the server will drop and recreate the database schema")
 	allowedIP = map[string]bool{"[::1]": true, "98.236.150.191": true, "174.51.196.185": true}
 )
 
 func main() {
+	// Sets some defaults and parses the flags
+	flag.Lookup("v").Value.Set("1")
+	flag.Lookup("v").DefValue = "1"
+	flag.Lookup("alsologtostderr").Value.Set("true")
+	flag.Lookup("alsologtostderr").DefValue = "true"
+
+	flag.Parse()
+
+	// movie-path must be set
+	if *moviePath == "" {
+		flag.PrintDefaults()
+		glog.Error("movie-path flag must be set")
+		return
+	}
+
 	// Sets up the threads and interrupt handler
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	interruptHandler()
@@ -63,39 +88,38 @@ func main() {
 	// cleanup
 	defer cleanupServer()
 
-	flag.Parse()
 	*srcPath = filepath.Clean(*srcPath)
 	*moviePath = filepath.Clean(*moviePath)
 
-	log.Print("Setting up SQL schema")
+	glog.V(infolevel).Info("Setting up SQL schema")
 	if err := connectRoot(); err != nil {
-		log.Print(err)
+		glog.Error(err)
 		return
 	}
 	if err := setupSchema(); err != nil {
-		log.Print(err)
+		glog.Error(err)
 		return
 	}
 	if err := compileSQL(); err != nil {
-		log.Print(err)
+		glog.Error(err)
 		return
 	}
 
-	log.Print("Starting the heartbeat")
+	glog.V(infolevel).Info("Starting the heartbeat")
 	startHeartbeat()
 
-	log.Print("Fetching html templates")
+	glog.V(infolevel).Info("Fetching html templates")
 	if err := fetchTemplates("index"); err != nil {
-		log.Print(err)
+		glog.Error(err)
 		return
 	}
 
 	http.HandleFunc(mainPath, mainHandler)
 	http.HandleFunc(fetchPath, fetchHandler)
 
-	log.Printf("Listening on port %s\n", *port)
-	if err := http.ListenAndServe(":" + *port, nil); err != nil {
-		log.Print(err)
+	glog.V(infolevel).Infof("Listening on port %d\n", *port)
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
+		glog.Error(err)
 		return
 	}
 }

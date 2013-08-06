@@ -4,7 +4,7 @@ package main
 
 import (
 	"path/filepath"
-	"log"
+	"github.com/golang/glog"
 	"os"
 	"strings"
 	"fmt"
@@ -18,7 +18,7 @@ var taskKilled = make(chan bool, numTasks)
 // Reindexes the movies directory, deleting from the movies table any
 // movie that isn't in the current list, and adding any new movies.
 func indexMovies() error {
-	log.Printf("Movie Indexer: indexing %s", *moviePath)
+	glog.V(infolevel).Infof("Movie Indexer: indexing %s", *moviePath)
 
 	movieNames := make([]interface{}, 0)
 	// Walks through the moviePath directory and appends any movie file
@@ -44,6 +44,7 @@ func indexMovies() error {
 		return err
 	}
 	placeholderStr := strings.Repeat("?, ", len(movieNames)-1) + "?"
+	fmt.Println(placeholderStr, movieNames)
 	if _, err = dbHandle.Exec(fmt.Sprintf("DELETE FROM movies WHERE name NOT IN (%s)", placeholderStr), movieNames...); err != nil {
 		return err
 	}
@@ -65,12 +66,12 @@ func runTask(hfunc func() error, hname string, interval time.Duration) {
 	for {
 		select {
 		case <- killTask:
-			log.Printf("Exiting %s", hname)
+			glog.V(infolevel).Infof("Exiting %s", hname)
 			taskKilled <- true
 			return
 		default:
 			if err := hfunc(); err != nil {
-				log.Printf("ERROR in %s: %s", hname, err)
+				glog.V(infolevel).Infof("%s: %s", hname, err)
 			}
 			time.Sleep(interval)
 		}
@@ -85,7 +86,7 @@ func startHeartbeat() {
 // Sticks numTasks signals on the killTask channel and waits for all
 // of them to signal on taskKilled
 func cleanupHeartbeat() {
-	log.Print("Cleaning up the heartbeat")
+	glog.V(infolevel).Info("Cleaning up the heartbeat")
 	for i := 0; i < numTasks; i++ {
 		killTask <- true
 	}

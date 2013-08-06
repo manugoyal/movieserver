@@ -3,7 +3,7 @@
 package main
 
 import (
-	"log"
+	"github.com/golang/glog"
 	"fmt"
 	"net/http"
 	"strings"
@@ -39,7 +39,7 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 
 	if len(r.URL.Path) == 1 {
 		httpError := func(err error) {
-			log.Printf("Error in main handler: %s", err)
+			glog.Errorf("Error in main handler: %s", err)
 			http.Error(w, fmt.Sprint("Failed to fetch movie names"), http.StatusInternalServerError)
 		}
 		// Reads the movies table to get all the movie names
@@ -78,7 +78,7 @@ func fetchHandler(w http.ResponseWriter, r *http.Request) {
 
 	filename := r.URL.Path[len(fetchPath):]
 	filelocation := *moviePath + "/" + filename
-	log.Printf("Fetching file: %s", filelocation)
+	glog.V(infolevel).Infof("Fetching file: %s", filelocation)
 	f, err := os.Open(filelocation)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Could not serve file %s", filename), http.StatusNotFound)
@@ -90,35 +90,20 @@ func fetchHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "binary/octet-stream")
 	http.ServeContent(w, r, filename, time.Time{}, rs)
-	log.Printf("Served file: %s", filelocation)
+	glog.V(infolevel).Infof("Served file: %s", filelocation)
 
 	// Updates the download count, if no rows were affected, it
 	// should have thrown the "could not serve file" error, so it
 	// panics here
 	res, err := insertStatements["addDownload"].Exec(filename)
 	if err != nil {
-		log.Printf("Error updating download count for %s: %s", filename, err)
+		glog.Errorf("Error updating download count for %s: %s", filename, err)
 	}
 	rowcount, err := res.RowsAffected();
 	if err != nil {
-		log.Print("Error retrieving rows affected for addDownload query")
+		glog.Error("Error retrieving rows affected for addDownload query")
 	}
 	if rowcount == 0 {
 		panic("Update changed 0 rows, so it should have thrown an error above")
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
