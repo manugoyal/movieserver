@@ -38,26 +38,32 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if len(r.URL.Path) == 1 {
-		httpError := func() {http.Error(w, fmt.Sprint("Failed to fetch movie names"), http.StatusInternalServerError)}
+		httpError := func(err error) {
+			log.Printf("Error in main handler: %s", err)
+			http.Error(w, fmt.Sprint("Failed to fetch movie names"), http.StatusInternalServerError)
+		}
 		// Reads the movies table to get all the movie names
 		rows, err := selectStatements["getNames"].Query()
 		if err != nil {
-			httpError()
+			httpError(err)
 			return
 		}
 		movieNames := make([]string, 0)
 		for rows.Next() {
 			var name string
 			if err = rows.Scan(&name); err != nil {
-				httpError()
+				httpError(err)
 				return
 			}
 			if err = rows.Err(); err != nil {
-				httpError()
+				httpError(err)
+				return
 			}
 			movieNames = append(movieNames, name)
 		}
-		runTemplate("index", w, movieNames)
+		if err = runTemplate("index", w, movieNames); err != nil {
+			httpError(err)
+		}
 	} else {
 		http.ServeFile(w, r, *srcPath + "/" + r.URL.Path[1:])
 	}
@@ -95,9 +101,24 @@ func fetchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	rowcount, err := res.RowsAffected();
 	if err != nil {
-		log.Fatal(err)
+		log.Print("Error retrieving rows affected for addDownload query")
 	}
 	if rowcount == 0 {
 		panic("Update changed 0 rows, so it should have thrown an error above")
 	}
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

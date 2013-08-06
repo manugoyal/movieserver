@@ -34,18 +34,21 @@ func compileSQL() error {
 	var err error
 	// newMovie adds a movie to the movies table. If the movie is
 	// already there, it does nothing
-	if insertStatements["newMovie"], err = dbHandle.Prepare("INSERT INTO movies(name) VALUES (?) ON DUPLICATE KEY UPDATE name=name"); err != nil {
+	const newMovie = "INSERT INTO movies(name) VALUES (?) ON DUPLICATE KEY UPDATE name=name"
+	if insertStatements["newMovie"], err = dbHandle.Prepare(newMovie); err != nil {
 		return err
 	}
 	// addDownload increments the number of downloads for an
 	// existing movie. If the movie isn't there, it won't throw an
 	// error, but it will say that 0 rows were affected.
-	if insertStatements["addDownload"], err = dbHandle.Prepare("UPDATE movies SET downloads=downloads+1 WHERE name=(?)"); err != nil {
+	const addDownload = "UPDATE movies SET downloads=downloads+1 WHERE name=(?)"
+	if insertStatements["addDownload"], err = dbHandle.Prepare(addDownload); err != nil {
 		return err
 	}
 
 	// getNames selects all the movie names from the movies table
-	if selectStatements["getNames"], err = dbHandle.Prepare("SELECT name FROM movies"); err != nil {
+	const getNames = "SELECT name FROM movies"
+	if selectStatements["getNames"], err = dbHandle.Prepare(getNames); err != nil {
 		return err
 	}
 
@@ -92,21 +95,22 @@ func setupSchema() error {
 }
 
 // Closes the sql statements and the dbHandle
-func cleanupDB() error {
+func cleanupDB() {
+	log.Print("Cleaning up DB connection")
+	const DBErrmsg = "Error during DB cleanup: %s"
 	var err error
 	for _, stmt := range(insertStatements) {
 		if err = stmt.Close(); err != nil {
-			return err
+			log.Printf(DBErrmsg, err)
 		}
 	}
 	for _, stmt := range(selectStatements) {
 		if err = stmt.Close(); err != nil {
-			return err
+			log.Printf(DBErrmsg, err)
 		}
 	}
 
 	if err = dbHandle.Close(); err != nil {
-		return err
+		log.Printf(DBErrmsg, err)
 	}
-	return nil
 }

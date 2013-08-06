@@ -26,7 +26,7 @@ func fetchTemplates(names ...string) (error) {
 }
 
 // Executes the given template and handles any errors
-func runTemplate(operationName string, w http.ResponseWriter, data interface{}) {
+func runTemplate(operationName string, w http.ResponseWriter, data interface{}) error {
 	t, ok := pageTemplates[operationName]
 	if !ok {
 		panic(fmt.Sprintf("Template %s doesn't exist", operationName))
@@ -34,9 +34,10 @@ func runTemplate(operationName string, w http.ResponseWriter, data interface{}) 
 
 	err := t.Execute(w, data)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	log.Printf("Rendered template %s", operationName)
+	return nil
 }
 

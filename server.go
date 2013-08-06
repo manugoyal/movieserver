@@ -8,6 +8,7 @@ import (
 	"flag"
 	"os"
 	"runtime"
+	"os/signal"
 )
 
 // Looks through all the gopaths to find a possible location for the
@@ -25,6 +26,27 @@ func srcdir() string {
 	return movieserverExt
 }
 
+// Calls all the cleanup functions
+func cleanupServer() {
+	cleanupDB()
+	cleanupHeartbeat()
+}
+
+// Monitors for interrupt signals and, upon getting one, calls
+// cleanupServer before exiting
+func interruptHandler() {
+	interruptNotifier := make(chan os.Signal, 1)
+	signal.Notify(interruptNotifier, os.Interrupt)
+	go func() {
+		select {
+		case <-interruptNotifier:
+			log.Print("Server received an interrupt: calling cleanup functions")
+			cleanupServer()
+			os.Exit(0)
+		}
+	}()
+}
+
 var (
 	srcPath = flag.String("src-path", srcdir(), "The path of the movieserver source directory")
 	moviePath = flag.String("movie-path", "movies", "The path of the movies directory")
@@ -34,37 +56,46 @@ var (
 )
 
 func main() {
+	// Sets up the threads and interrupt handler
 	runtime.GOMAXPROCS(runtime.NumCPU())
+	interruptHandler()
+	// If we exit this function prematurely, we still want to run
+	// cleanup
+	defer cleanupServer()
 
 	flag.Parse()
 	*srcPath = filepath.Clean(*srcPath)
 	*moviePath = filepath.Clean(*moviePath)
 
 	log.Print("Setting up SQL schema")
-	err := connectRoot()
-	if err != nil {
-		log.Fatal(err)
+	if err := connectRoot(); err != nil {
+		log.Print(err)
+		return
 	}
-	defer cleanupDB()
-	if err = setupSchema(); err != nil {
-		log.Fatal(err)
+	if err := setupSchema(); err != nil {
+		log.Print(err)
+		return
 	}
-	if err = compileSQL(); err != nil {
-		log.Fatal(err)
+	if err := compileSQL(); err != nil {
+		log.Print(err)
+		return
 	}
 
 	log.Print("Starting the heartbeat")
 	startHeartbeat()
 
 	log.Print("Fetching html templates")
-	err = fetchTemplates("index")
-	if err != nil {
-		log.Fatal(err)
+	if err := fetchTemplates("index"); err != nil {
+		log.Print(err)
+		return
 	}
 
 	http.HandleFunc(mainPath, mainHandler)
 	http.HandleFunc(fetchPath, fetchHandler)
 
 	log.Printf("Listening on port %s\n", *port)
-	http.ListenAndServe(":" + *port, nil)
+	if err := http.ListenAndServe(":" + *port, nil); err != nil {
+		log.Print(err)
+		return
+	}
 }

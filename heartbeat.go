@@ -11,11 +11,14 @@ import (
 	"time"
 )
 
+const numTasks = 1
+var killTask = make(chan bool, numTasks)
+
 
 // Reindexes the movies directory, deleting from the movies table any
 // movie that isn't in the current list, and adding any new movies.
 func indexMovies() error {
-	log.Print("Indexing movie directory")
+	log.Printf("movie indexer: indexing %s", *moviePath)
 
 	movieNames := make([]interface{}, 0)
 	// Walks through the moviePath directory and appends any movie file
@@ -45,7 +48,8 @@ func indexMovies() error {
 		return err
 	}
 
-	// Adds all the movies in movieNames (it does nothing if the movie already exists)
+	// Adds all the movies in movieNames (the query does nothing
+	// if the movie already exists)
 	for _, name := range(movieNames) {
 		if _, err = insertStatements["newMovie"].Exec(name); err != nil {
 			return err
@@ -54,18 +58,33 @@ func indexMovies() error {
 	return nil
 }
 
-// Runs the given heartbeat function continuously after sleeping for
-// the given interval and logs any errors
-func runHeartbeat(hfunc func() error, hname string, interval time.Duration) {
+// Runs the given task continuously after sleeping for the given
+// interval and logs any errors. Returns when it finds a value on the
+// channel
+func runTask(hfunc func() error, hname string, interval time.Duration) {
 	for {
-		if err := hfunc(); err != nil {
-			log.Printf("ERROR in %s: %s", hname, err)
+		select {
+		case <- killTask:
+			log.Print("Exiting", hname)
+			return
+		default:
+			if err := hfunc(); err != nil {
+				log.Printf("ERROR in %s: %s", hname, err)
+			}
+			time.Sleep(interval)
 		}
-		time.Sleep(interval)
 	}
 }
 
-// Starts each heartbeat at it's time interval
+// Starts each task at it's time interval
 func startHeartbeat() {
-	go runHeartbeat(indexMovies, "movie indexer", 5 * time.Second)
+	go runTask(indexMovies, "movie indexer", 5 * time.Second)
+}
+
+// Sticks numTasks signals on the killTask channel
+func cleanupHeartbeat() {
+	log.Print("Cleaning up the heartbeat")
+	for i := 0; i < numTasks; i++ {
+		killTask <- true
+	}
 }
