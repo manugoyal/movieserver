@@ -19,21 +19,25 @@ const (
 )
 
 // Makes sure that the request's ip is allowed. Sends an error message
-// if it isn't. Returns true if it is allowed, false if it isn't
-func checkAccess(w http.ResponseWriter, r *http.Request) bool {
+// if it isn't. Returns an error if it isn't
+func checkAccess(w http.ResponseWriter, r *http.Request) error {
 	ipstr := r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")]
-	if _, ok := allowedIP[ipstr]; !ok {
-		http.Error(w, fmt.Sprint("You do not have access to this site"), http.StatusServiceUnavailable)
-		return false
+	row := selectStatements["getAddr"].QueryRow(ipstr)
+	var throwaway string
+	if err := row.Scan(&throwaway); err != nil {
+		glog.Error(err)
+		http.Error(w, "You do not have access to this site", http.StatusServiceUnavailable)
+		return fmt.Errorf("IP %s was not found", ipstr)
 	}
-	return true
+	return nil
 }
 
 // If the URL is empty (just "/"), then it serves the index template
 // with the movie names from the movies table. Otherwise, it serves
 // the file named by the path
 func mainHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkAccess(w, r) {
+	if err := checkAccess(w, r); err != nil {
+		glog.Error(err)
 		return
 	}
 
@@ -72,7 +76,8 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 // Serves the specified file, incrementing the download count.
 // *moviePath should not be in the url
 func fetchHandler(w http.ResponseWriter, r *http.Request) {
-	if !checkAccess(w, r) {
+	if err := checkAccess(w, r); err != nil {
+		glog.Error(err)
 		return
 	}
 

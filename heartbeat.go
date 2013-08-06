@@ -9,11 +9,15 @@ import (
 	"strings"
 	"fmt"
 	"time"
+	"sync"
 )
 
 const numTasks = 1
-var killTask = make(chan bool, numTasks)
-var taskKilled = make(chan bool, numTasks)
+
+var (
+	killTask = make(chan bool, numTasks)
+	heartbeatWG sync.WaitGroup
+)
 
 // Reindexes the movies directory, deleting from the movies table any
 // movie that isn't in the current list, and adding any new movies.
@@ -44,7 +48,6 @@ func indexMovies() error {
 		return err
 	}
 	placeholderStr := strings.Repeat("?, ", len(movieNames)-1) + "?"
-	fmt.Println(placeholderStr, movieNames)
 	if _, err = dbHandle.Exec(fmt.Sprintf("DELETE FROM movies WHERE name NOT IN (%s)", placeholderStr), movieNames...); err != nil {
 		return err
 	}
@@ -67,11 +70,11 @@ func runTask(hfunc func() error, hname string, interval time.Duration) {
 		select {
 		case <- killTask:
 			glog.V(infolevel).Infof("Exiting %s", hname)
-			taskKilled <- true
+			heartbeatWG.Done()
 			return
 		default:
 			if err := hfunc(); err != nil {
-				glog.V(infolevel).Infof("%s: %s", hname, err)
+				glog.Errorf("%s: %s", hname, err)
 			}
 			time.Sleep(interval)
 		}
@@ -79,8 +82,10 @@ func runTask(hfunc func() error, hname string, interval time.Duration) {
 }
 
 // Starts each task at it's time interval
-func startHeartbeat() {
+func startupHeartbeat() error {
+	heartbeatWG.Add(numTasks)
 	go runTask(indexMovies, "Movie Indexer", 5 * time.Second)
+	return nil
 }
 
 // Sticks numTasks signals on the killTask channel and waits for all
@@ -90,7 +95,5 @@ func cleanupHeartbeat() {
 	for i := 0; i < numTasks; i++ {
 		killTask <- true
 	}
-	for i := 0; i < numTasks; i++ {
-		<-taskKilled
-	}
+	heartbeatWG.Wait()
 }

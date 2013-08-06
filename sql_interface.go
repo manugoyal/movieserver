@@ -17,11 +17,10 @@ var (
 	selectStatements = make(map[string]*sql.Stmt)
 )
 
-// Creates a *DB handle with user "root" and no other connection
-// params. Also compiles the SQL statements
-func connectRoot() error {
+// Creates a *DB handle with user root to the given database
+func connectRoot(dbName string) error {
 	var err error
-	dbHandle, err = sql.Open("mysql", "root@/")
+	dbHandle, err = sql.Open("mysql", "root@/" + dbName)
 	if err != nil {
 		return err
 	}
@@ -37,10 +36,15 @@ const (
 // Runs the conf/setup.sql file. In the file, statements are separated
 // by the stmtSep string. If the refreshSchema flag is true, we
 // execute statements prefixed by refreshPrefix, otherwise we skip
-// them
+// them. First it connects to no database to run the setup.sql
+// statements, since they should create the movieserver database if
+// that doesn't exist. Then it reconnects to the movieserver database
+// (it can't rely on the USE database statement to use the database
+// for subsequent statements run concurrently due to a bug in the
+// mysql driver)
 func setupSchema() error {
-	if dbHandle == nil || dbHandle.Ping() != nil {
-		panic("dbHandle isn't set up yet")
+	if err := connectRoot(""); err != nil {
+		return err
 	}
 	setupBytes, err := ioutil.ReadFile(*srcPath + "/conf/setup.sql")
 	if err != nil {
@@ -65,6 +69,14 @@ func setupSchema() error {
 			}
 		}
 	}
+
+	// Reconnects to the movieserver database
+	if err := dbHandle.Close(); err != nil {
+		return err
+	}
+	if err := connectRoot("movieserver"); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -80,7 +92,7 @@ func compileSQL() error {
 	// addDownload increments the number of downloads for an
 	// existing movie. If the movie isn't there, it won't throw an
 	// error, but it will say that 0 rows were affected.
-	const addDownload = "UPDATE movies SET downloads=downloads+1 WHERE name=(?)"
+	const addDownload = "UPDATE movies SET downloads=downloads+1 WHERE name=?"
 	if insertStatements["addDownload"], err = dbHandle.Prepare(addDownload); err != nil {
 		return err
 	}
@@ -90,8 +102,21 @@ func compileSQL() error {
 	if selectStatements["getNames"], err = dbHandle.Prepare(getNames); err != nil {
 		return err
 	}
+	// getAddr selects the ip addresse that matches a given value
+	const getAddr = "SELECT address from ips WHERE address = ?"
+	if selectStatements["getAddr"], err = dbHandle.Prepare(getAddr); err != nil {
+		return err
+	}
 
 	return nil
+}
+
+// Initializes the dbHandle, sets up the schema, and compiles the SQL
+func startupDB() error {
+	if err := setupSchema(); err != nil {
+		return err
+	}
+	return compileSQL()
 }
 
 // Closes the sql statements and the dbHandle
@@ -101,16 +126,16 @@ func cleanupDB() {
 	var err error
 	for _, stmt := range(insertStatements) {
 		if err = stmt.Close(); err != nil {
-			glog.V(infolevel).Infof(DBErrmsg, err)
+			glog.Errorf(DBErrmsg, err)
 		}
 	}
 	for _, stmt := range(selectStatements) {
 		if err = stmt.Close(); err != nil {
-			glog.V(infolevel).Infof(DBErrmsg, err)
+			glog.Errorf(DBErrmsg, err)
 		}
 	}
 
 	if err = dbHandle.Close(); err != nil {
-		glog.V(infolevel).Infof(DBErrmsg, err)
+		glog.Errorf(DBErrmsg, err)
 	}
 }

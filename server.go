@@ -62,7 +62,6 @@ var (
 	moviePath = flag.String("movie-path", "", "REQUIRED: The path of the movies directory")
 	port = flag.Uint64("port", 8080, "The port to listen on")
 	refreshSchema = flag.Bool("refresh-schema", false, "If true, the server will drop and recreate the database schema")
-	allowedIP = map[string]bool{"[::1]": true, "98.236.150.191": true, "174.51.196.185": true}
 )
 
 func main() {
@@ -92,21 +91,15 @@ func main() {
 	*moviePath = filepath.Clean(*moviePath)
 
 	glog.V(infolevel).Info("Setting up SQL schema")
-	if err := connectRoot(); err != nil {
+	if err := startupDB(); err != nil {
 		glog.Error(err)
 		return
 	}
-	if err := setupSchema(); err != nil {
-		glog.Error(err)
-		return
-	}
-	if err := compileSQL(); err != nil {
-		glog.Error(err)
-		return
-	}
-
 	glog.V(infolevel).Info("Starting the heartbeat")
-	startHeartbeat()
+	if err := startupHeartbeat(); err != nil {
+		glog.Error(err)
+		return
+	}
 
 	glog.V(infolevel).Info("Fetching html templates")
 	if err := fetchTemplates("index"); err != nil {
