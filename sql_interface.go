@@ -112,12 +112,12 @@ func compileSQL() error {
 		return err
 	}
 
-	// getNames selects all the movie names from the movies table
-	const getNames = "SELECT name FROM movies"
-	if selectStatements["getNames"], err = dbHandle.Prepare(getNames); err != nil {
+	// getMovies selects all the movie names and downloads from the movies table
+	const getNames = "SELECT name, downloads FROM movies"
+	if selectStatements["getMovies"], err = dbHandle.Prepare(getNames); err != nil {
 		return err
 	}
-	// getAddr selects the ip addresse that matches a given value
+	// getAddr selects the ip addresses that matches a given value
 	const getAddr = "SELECT address from ips WHERE address = ?"
 	if selectStatements["getAddr"], err = dbHandle.Prepare(getAddr); err != nil {
 		return err

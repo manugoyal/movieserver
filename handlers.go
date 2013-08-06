@@ -47,6 +47,11 @@ func checkAccess(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+type movieRow struct {
+	Name string
+	Downloads uint64
+}
+
 // If the URL is empty (just "/"), then it serves the index template
 // with the movie names from the movies table. Otherwise, it serves
 // the file named by the path
@@ -61,26 +66,26 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 			glog.Errorf("Error in main handler: %s", err)
 			http.Error(w, fmt.Sprint("Failed to fetch movie names"), http.StatusInternalServerError)
 		}
-		// Reads the movies table to get all the movie names
-		rows, err := selectStatements["getNames"].Query()
+		// Reads the movies table to get all the movie names and downloads
+		rows, err := selectStatements["getMovies"].Query()
 		if err != nil {
 			httpError(err)
 			return
 		}
-		movieNames := make([]string, 0)
+		movies := make([]movieRow, 0)
 		for rows.Next() {
-			var name string
-			if err = rows.Scan(&name); err != nil {
+			var r movieRow
+			if err = rows.Scan(&r.Name, &r.Downloads); err != nil {
 				httpError(err)
 				return
 			}
-			if err = rows.Err(); err != nil {
-				httpError(err)
-				return
-			}
-			movieNames = append(movieNames, name)
+			movies = append(movies, r)
 		}
-		if err = runTemplate("index", w, movieNames); err != nil {
+		if err = rows.Err(); err != nil {
+			httpError(err)
+			return
+		}
+		if err = runTemplate("index", w, movies); err != nil {
 			httpError(err)
 		}
 	} else {

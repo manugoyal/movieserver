@@ -36,14 +36,16 @@ specific language governing permissions and limitations under the License.
         <table border="1">
 
           <tr>
-            <th> Movies </th>
+            <th class="centered"> Movies </th>
+            <th class="centered"> Downloads </th>
           </tr>
           {{range .}}<tr>
             <td>
-              <form class="download-button" method="get" action="fetch/{{.}}">
-                <button type="submit" class="btn btn-link btn-sm"> {{.}} </button>
+              <form class="download-button" method="get" action="fetch/{{.Name}}">
+                <button type="submit" class="btn btn-link btn-sm"> {{.Name}} </button>
               </form>
             </td>
+            <td class="centered"> {{.Downloads}} </td>
           </tr>{{end}}
 
         </table>
