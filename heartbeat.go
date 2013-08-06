@@ -13,12 +13,12 @@ import (
 
 const numTasks = 1
 var killTask = make(chan bool, numTasks)
-
+var taskKilled = make(chan bool, numTasks)
 
 // Reindexes the movies directory, deleting from the movies table any
 // movie that isn't in the current list, and adding any new movies.
 func indexMovies() error {
-	log.Printf("movie indexer: indexing %s", *moviePath)
+	log.Printf("Movie Indexer: indexing %s", *moviePath)
 
 	movieNames := make([]interface{}, 0)
 	// Walks through the moviePath directory and appends any movie file
@@ -65,7 +65,8 @@ func runTask(hfunc func() error, hname string, interval time.Duration) {
 	for {
 		select {
 		case <- killTask:
-			log.Print("Exiting", hname)
+			log.Printf("Exiting %s", hname)
+			taskKilled <- true
 			return
 		default:
 			if err := hfunc(); err != nil {
@@ -78,13 +79,17 @@ func runTask(hfunc func() error, hname string, interval time.Duration) {
 
 // Starts each task at it's time interval
 func startHeartbeat() {
-	go runTask(indexMovies, "movie indexer", 5 * time.Second)
+	go runTask(indexMovies, "Movie Indexer", 5 * time.Second)
 }
 
-// Sticks numTasks signals on the killTask channel
+// Sticks numTasks signals on the killTask channel and waits for all
+// of them to signal on taskKilled
 func cleanupHeartbeat() {
 	log.Print("Cleaning up the heartbeat")
 	for i := 0; i < numTasks; i++ {
 		killTask <- true
+	}
+	for i := 0; i < numTasks; i++ {
+		<-taskKilled
 	}
 }

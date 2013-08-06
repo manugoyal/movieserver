@@ -1,5 +1,0 @@
-* Drop and recreate database in setup.sql
-* Add IPs to the IPs table
-* Update README to reflect dependencies and installation instructions
-* Add download count to movies table in display
-* Refresh button for movies table

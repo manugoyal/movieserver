@@ -21,38 +21,12 @@ var (
 // params. Also compiles the SQL statements
 func connectRoot() error {
 	var err error
-	dbHandle, err = sql.Open("mysql", "root@/movieserver")
+	dbHandle, err = sql.Open("mysql", "root@/")
 	if err != nil {
 		return err
 	}
 	err = dbHandle.Ping()
 	return err
-}
-
-// Compiles the predefined SQL statements
-func compileSQL() error {
-	var err error
-	// newMovie adds a movie to the movies table. If the movie is
-	// already there, it does nothing
-	const newMovie = "INSERT INTO movies(name) VALUES (?) ON DUPLICATE KEY UPDATE name=name"
-	if insertStatements["newMovie"], err = dbHandle.Prepare(newMovie); err != nil {
-		return err
-	}
-	// addDownload increments the number of downloads for an
-	// existing movie. If the movie isn't there, it won't throw an
-	// error, but it will say that 0 rows were affected.
-	const addDownload = "UPDATE movies SET downloads=downloads+1 WHERE name=(?)"
-	if insertStatements["addDownload"], err = dbHandle.Prepare(addDownload); err != nil {
-		return err
-	}
-
-	// getNames selects all the movie names from the movies table
-	const getNames = "SELECT name FROM movies"
-	if selectStatements["getNames"], err = dbHandle.Prepare(getNames); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 const (
@@ -91,6 +65,32 @@ func setupSchema() error {
 			}
 		}
 	}
+	return nil
+}
+
+// Compiles the predefined SQL statements
+func compileSQL() error {
+	var err error
+	// newMovie adds a movie to the movies table. If the movie is
+	// already there, it does nothing
+	const newMovie = "INSERT INTO movies(name) VALUES (?) ON DUPLICATE KEY UPDATE name=name"
+	if insertStatements["newMovie"], err = dbHandle.Prepare(newMovie); err != nil {
+		return err
+	}
+	// addDownload increments the number of downloads for an
+	// existing movie. If the movie isn't there, it won't throw an
+	// error, but it will say that 0 rows were affected.
+	const addDownload = "UPDATE movies SET downloads=downloads+1 WHERE name=(?)"
+	if insertStatements["addDownload"], err = dbHandle.Prepare(addDownload); err != nil {
+		return err
+	}
+
+	// getNames selects all the movie names from the movies table
+	const getNames = "SELECT name FROM movies"
+	if selectStatements["getNames"], err = dbHandle.Prepare(getNames); err != nil {
+		return err
+	}
+
 	return nil
 }
 

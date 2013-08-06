@@ -1,3 +1,9 @@
+--#DROP DATABASE IF EXISTS movieserver
+----------
+CREATE DATABASE IF NOT EXISTS movieserver
+----------
+USE movieserver
+----------
 --#DROP TABLE IF EXISTS ips
 ----------
 CREATE TABLE IF NOT EXISTS ips(
