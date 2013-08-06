@@ -50,8 +50,10 @@ func main() {
 		log.Fatal(err)
 	}
 	defer cleanupDB()
-	err = setupSchema()
-	if err != nil {
+	if err = setupSchema(); err != nil {
+		log.Fatal(err)
+	}
+	if err = compileSQL(); err != nil {
 		log.Fatal(err)
 	}
 

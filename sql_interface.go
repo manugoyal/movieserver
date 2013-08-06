@@ -26,10 +26,12 @@ func connectRoot() error {
 		return err
 	}
 	err = dbHandle.Ping()
-	if err != nil {
-		return err
-	}
-	
+	return err
+}
+
+// Compiles the predefined SQL statements
+func compileSQL() error {
+	var err error
 	// newMovie adds a movie to the movies table. If the movie is
 	// already there, it does nothing
 	if insertStatements["newMovie"], err = dbHandle.Prepare("INSERT INTO movies(name) VALUES (?) ON DUPLICATE KEY UPDATE name=name"); err != nil {
