@@ -6,26 +6,60 @@ import (
 	"net/http"
 	"path/filepath"
 	"flag"
+	"os"
+	"runtime"
 )
 
 const (
 	port = ":8080"
 )
 
+
+// Looks through all the gopaths to find a possible location for the
+// movieserver source. Returns the value of movieserverExt if it
+// didn't find anything.
+func srcdir() string {
+	gopaths := filepath.SplitList(os.ExpandEnv("$GOPATH"))
+	movieserverExt := "/src/github.com/manugoyal/movieserver"
+	for _, path := range(gopaths) {
+		_, err := os.Stat(path + movieserverExt)
+		if err == nil {
+			return path + movieserverExt
+		}
+	}
+	return movieserverExt
+}
+
 var (
 	srcPath = flag.String("src-path", srcdir(), "The path of the movieserver source directory")
 	moviePath = flag.String("movie-path", "movies", "The path of the movies directory")
-	movieNames []string
+	refreshSchema = flag.Bool("refresh-schema", false, "If true, the server will drop and recreate the database schema")
 	allowedIP = map[string]bool{"[::1]": true, "98.236.150.191": true, "174.51.196.185": true}
 )
 
 func main() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+
 	flag.Parse()
 	*srcPath = filepath.Clean(*srcPath)
 	*moviePath = filepath.Clean(*moviePath)
 
+	log.Print("Setting up SQL schema")
+	err := connectRoot()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer cleanupDB()
+	err = setupSchema()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	log.Print("Starting the heartbeat")
+	startHeartbeat()
+
 	log.Print("Fetching html templates")
-	err := fetchTemplates("index")
+	err = fetchTemplates("index")
 	if err != nil {
 		log.Fatal(err)
 	}
