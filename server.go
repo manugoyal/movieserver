@@ -10,11 +10,6 @@ import (
 	"runtime"
 )
 
-const (
-	port = ":8080"
-)
-
-
 // Looks through all the gopaths to find a possible location for the
 // movieserver source. Returns the value of movieserverExt if it
 // didn't find anything.
@@ -33,6 +28,7 @@ func srcdir() string {
 var (
 	srcPath = flag.String("src-path", srcdir(), "The path of the movieserver source directory")
 	moviePath = flag.String("movie-path", "movies", "The path of the movies directory")
+	port = flag.String("port", "8080", "The port to listen on")
 	refreshSchema = flag.Bool("refresh-schema", false, "If true, the server will drop and recreate the database schema")
 	allowedIP = map[string]bool{"[::1]": true, "98.236.150.191": true, "174.51.196.185": true}
 )
@@ -69,6 +65,6 @@ func main() {
 	http.HandleFunc(mainPath, mainHandler)
 	http.HandleFunc(fetchPath, fetchHandler)
 
-	log.Printf("Listening on port %s\n", port[1:])
-	http.ListenAndServe(port, nil)
+	log.Printf("Listening on port %s\n", *port)
+	http.ListenAndServe(":" + *port, nil)
 }
