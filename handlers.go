@@ -20,9 +20,11 @@ const (
 
 // Makes sure that the request's ip is allowed. Sends an error message
 // if it isn't. Returns true if it is allowed, false if it isn't
-func checkAccess(w http.ResponseWriter, r *http.Request) bool {
-	ipstr := r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")]
-	if _, ok := allowedIP[ipstr]; !ok {
+func checkAccessHandler(w http.ResponseWriter, r *http.Request) bool {
+	user = r.FormValue("username")
+	password = r.FormValue("password")
+	usercheck = user+password	
+	if _, ok := allowedusers[usercheck]; !ok {
 		http.Error(w, fmt.Sprint("You do not have access to this site"), http.StatusServiceUnavailable)
 		return false
 	}
@@ -33,6 +35,7 @@ func checkAccess(w http.ResponseWriter, r *http.Request) bool {
 // with the movie names from the movies table. Otherwise, it serves
 // the file named by the path
 func mainHandler(w http.ResponseWriter, r *http.Request) {
+		
 	if !checkAccess(w, r) {
 		return
 	}

@@ -13,3 +13,10 @@ CREATE TABLE IF NOT EXISTS movies(
         downloads bigint unsigned default 0,
         key downloads(downloads)
         )
+
+CREATE TABLE IF NOT EXISTS setup(
+	users varchar(255) primary key NOT NULL,
+	passwords varchar(255) NOT NULL,
+	key users(users)
+	)
+	

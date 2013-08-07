@@ -34,7 +34,7 @@ var (
 	srcPath = flag.String("src-path", srcdir(), "The path of the movieserver source directory")
 	moviePath = flag.String("movie-path", "movies", "The path of the movies directory")
 	refreshSchema = flag.Bool("refresh-schema", false, "If true, the server will drop and recreate the database schema")
-	allowedIP = map[string]bool{"[::1]": true, "98.236.150.191": true, "174.51.196.185": true}
+	allowedusers = map[string]bool{"guardianxeroaznpride1": true, "manugoyaldesipride1": true, "rootroot": true}
 )
 
 func main() {
@@ -59,7 +59,7 @@ func main() {
 	startHeartbeat()
 
 	log.Print("Fetching html templates")
-	err = fetchTemplates("index")
+	err = fetchTemplates("login")
 	if err != nil {
 		log.Fatal(err)
 	}
