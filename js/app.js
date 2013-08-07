@@ -13,25 +13,17 @@ CONDITIONS OF ANY KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations under the License.
  */
 
-requirejs.config({
-  paths: {
-    'jquery':        'libs/jquery',
-    'underscore':    'libs/underscore',
-    'backbone':      'libs/backbone',
-    'text':          'libs/text/text'
-  },
+/*
+ * The application called on startup.
+ * exports: App
+ */
 
-  shim: {
-    'jquery': { exports: '$' },
-    'underscore': { exports: '_' },
-
-    'backbone': {
-      deps: ['jquery', 'underscore'],
-      exports: 'Backbone'
-    }
-  }
-});
-
-requirejs(['app'], function(App) {
-  App.initialize();
+define(['jquery', 'views/movie_table'], function ($, MovieTableView) {
+  var App = {
+      initialize: function () {
+        var movieTableView = new MovieTableView({ el: $('#movieTable') });
+        setInterval(_.bind(movieTableView.refresh, movieTableView), 5000);
+      }
+  };
+  return App;
 });

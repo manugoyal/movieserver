@@ -1,0 +1,6 @@
+<td>
+  <form class="download-form" method="get" action="movie/<%= movie.get('Name') %>">
+    <button type="submit" class="movie-button btn btn-link btn-sm"> <%= movie.get('Name') %> </button>
+  </form>
+</td>
+<td class="centered"> <%= movie.get('Downloads') %> </td>

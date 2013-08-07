@@ -77,6 +77,7 @@ var (
 	moviePath = flag.String("movie-path", "", "REQUIRED: The path of the movies directory")
 	port = flag.Uint64("port", 8080, "The port to listen on")
 	refreshSchema = flag.Bool("refresh-schema", false, "If true, the server will drop and recreate the database schema")
+	unblockIPs = flag.Bool("unblock-ips", false, "If true, the server will not restrict access to the allowed IP addresses")
 )
 
 func main() {
@@ -122,8 +123,8 @@ func main() {
 		return
 	}
 
-	http.HandleFunc(mainPath, mainHandler)
-	http.HandleFunc(fetchPath, fetchHandler)
+	glog.V(infolevel).Info("Installing handlers")
+	installHandlers()
 
 	glog.V(infolevel).Infof("Listening on port %d\n", *port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
