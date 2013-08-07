@@ -17,7 +17,7 @@ specific language governing permissions and limitations under the License.
 <html>
   <head>
     <!-- RequireJS -->
-    <script data-main="js/startup" src="js/require.js"></script>
+    <script data-main="js/startup" src="js/libs/require.js"></script>
 
     <!-- CSS -->
     <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.no-icons.min.css" rel="stylesheet" />
@@ -31,24 +31,18 @@ specific language governing permissions and limitations under the License.
   </head>
 
   <body>
-    <div class="container">
-      <div class="row">
-        <table border="1">
-
-          <tr>
-            <th class="centered"> Movies </th>
-            <th class="centered"> Downloads </th>
-          </tr>
-          {{range .}}<tr>
-            <td>
-              <form class="download-button" method="get" action="fetch/{{.Name}}">
-                <button type="submit" class="btn btn-link btn-sm"> {{.Name}} </button>
-              </form>
-            </td>
-            <td class="centered"> {{.Downloads}} </td>
-          </tr>{{end}}
-
-        </table>
+    <div id="container" class="container">
+      <div class="span12">
+        <div class="row">
+          <div class="span12">
+            <table id="movieTable" border="1">
+              <tr>
+                <th class="centered"> Movies </th>
+                <th class="centered"> Downloads </th>
+              </tr>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   </body>

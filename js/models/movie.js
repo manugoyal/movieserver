@@ -13,25 +13,21 @@ CONDITIONS OF ANY KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations under the License.
  */
 
-requirejs.config({
-  paths: {
-    'jquery':        'libs/jquery',
-    'underscore':    'libs/underscore',
-    'backbone':      'libs/backbone',
-    'text':          'libs/text/text'
-  },
+/*
+ * The model of a single movie in a movies collection.
+ * exports: MovieModel
+ */
 
-  shim: {
-    'jquery': { exports: '$' },
-    'underscore': { exports: '_' },
+define(['backbone'],
+       function(Backbone) {
+         var MovieModel = Backbone.Model.extend({
 
-    'backbone': {
-      deps: ['jquery', 'underscore'],
-      exports: 'Backbone'
-    }
-  }
-});
+           defaults: {
+             Name: '',
+             Downloads: 0
+           }
 
-requirejs(['app'], function(App) {
-  App.initialize();
-});
+         });
+
+         return MovieModel;
+       });

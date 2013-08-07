@@ -13,25 +13,24 @@ CONDITIONS OF ANY KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations under the License.
  */
 
-requirejs.config({
-  paths: {
-    'jquery':        'libs/jquery',
-    'underscore':    'libs/underscore',
-    'backbone':      'libs/backbone',
-    'text':          'libs/text/text'
-  },
+/*
+ * A movie table collection represents a table in the movieserver database
+ * exports: TableCollection
+ */
 
-  shim: {
-    'jquery': { exports: '$' },
-    'underscore': { exports: '_' },
+define(['backbone', 'models/movie'],
+       function(Backbone, MovieModel) {
+         var MovieTableCollection = Backbone.Collection.extend({
 
-    'backbone': {
-      deps: ['jquery', 'underscore'],
-      exports: 'Backbone'
-    }
-  }
-});
+           model: MovieModel,
 
-requirejs(['app'], function(App) {
-  App.initialize();
-});
+           url: 'table/movies',
+
+           dofetch: function() {
+                      this.fetch({reset: true});
+                    }
+
+         });
+
+         return MovieTableCollection;
+       });

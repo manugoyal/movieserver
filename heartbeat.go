@@ -34,8 +34,8 @@ var (
 	heartbeatWG sync.WaitGroup
 )
 
-// Reindexes the movies directory, deleting from the movies table any
-// movie that isn't in the current list, and adding any new movies.
+// Reindexes the movies directory, setting not present to any movie
+// that isn't in the current list, and adding any new movies.
 func indexMovies() error {
 	glog.V(infolevel).Infof("Movie Indexer: indexing %s", *moviePath)
 
@@ -57,20 +57,20 @@ func indexMovies() error {
 		return err
 	}
 
-	// Deletes any movies that aren't in movieNames
+	// Sets present for any movies that aren't in movieNames to FALSE
 	if len(movieNames) == 0 {
-		_, err = dbHandle.Exec("DELETE FROM movies")
+		_, err = dbHandle.Exec("UPDATE movies SET present=FALSE")
 		return err
 	}
 	placeholderStr := strings.Repeat("?, ", len(movieNames)-1) + "?"
-	if _, err = dbHandle.Exec(fmt.Sprintf("DELETE FROM movies WHERE name NOT IN (%s)", placeholderStr), movieNames...); err != nil {
+	arguments := append([]interface{}{*moviePath}, movieNames...)
+	if _, err = dbHandle.Exec(fmt.Sprintf("UPDATE movies SET present=FALSE WHERE path != ? OR name NOT IN (%s)", placeholderStr), arguments...); err != nil {
 		return err
 	}
 
-	// Adds all the movies in movieNames (the query does nothing
-	// if the movie already exists)
+	// Adds all the movies in movieNames
 	for _, name := range(movieNames) {
-		if _, err = insertStatements["newMovie"].Exec(name); err != nil {
+		if _, err = insertStatements["newMovie"].Exec(*moviePath, name); err != nil {
 			return err
 		}
 	}

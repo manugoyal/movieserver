@@ -25,17 +25,21 @@ import (
 	"time"
 	"os"
 	"io"
+	"encoding/json"
 )
 
 const (
-	imagePath = "images/"
-	mainPath = "/"
-	fetchPath = "/fetch/"
+	mainURL = "/"
+	moviesTableURL = "/table/movies"
+	movieURL = "/movie/"
 )
 
 // Makes sure that the request's ip is allowed. Sends an error message
 // if it isn't. Returns an error if it isn't
 func checkAccess(w http.ResponseWriter, r *http.Request) error {
+	if *unblockIPs {
+		return nil
+	}
 	ipstr := r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")]
 	row := selectStatements["getAddr"].QueryRow(ipstr)
 	var throwaway string
@@ -52,56 +56,75 @@ type movieRow struct {
 	Downloads uint64
 }
 
-// If the URL is empty (just "/"), then it serves the index template
-// with the movie names from the movies table. Otherwise, it serves
-// the file named by the path
+// If the URL is empty (just "/"), then it serves the index template.
+// Otherwise, it serves the file named by the path.
 func mainHandler(w http.ResponseWriter, r *http.Request) {
 	if err := checkAccess(w, r); err != nil {
 		glog.Error(err)
 		return
 	}
-
-	if len(r.URL.Path) == 1 {
-		httpError := func(err error) {
-			glog.Errorf("Error in main handler: %s", err)
-			http.Error(w, fmt.Sprint("Failed to fetch movie names"), http.StatusInternalServerError)
-		}
-		// Reads the movies table to get all the movie names and downloads
-		rows, err := selectStatements["getMovies"].Query()
-		if err != nil {
-			httpError(err)
-			return
-		}
-		movies := make([]movieRow, 0)
-		for rows.Next() {
-			var r movieRow
-			if err = rows.Scan(&r.Name, &r.Downloads); err != nil {
-				httpError(err)
-				return
-			}
-			movies = append(movies, r)
-		}
-		if err = rows.Err(); err != nil {
-			httpError(err)
-			return
-		}
-		if err = runTemplate("index", w, movies); err != nil {
-			httpError(err)
+	if len(r.URL.Path) == len(mainURL) {
+		if err := runTemplate("index", w, nil); err != nil {
+			glog.Error(err)
+			http.Error(w, fmt.Sprint("Failed to fetch home page"), http.StatusInternalServerError)
 		}
 	} else {
-		http.ServeFile(w, r, *srcPath + "/" + r.URL.Path[1:])
+		http.ServeFile(w, r, *srcPath + "/" + r.URL.Path[len(mainURL):])
 	}
 }
 
-// Serves the specified file, incrementing the download count.
-// *moviePath should not be in the url
-func fetchHandler(w http.ResponseWriter, r *http.Request) {
+// Serves the movies and downloads that are present from the movies
+// table as a JSON object
+func moviesTableHandler(w http.ResponseWriter, r *http.Request) {
+	if err := checkAccess(w, r); err != nil {
+		glog.Error(err)
+		return
+	}
+	httpError := func(err error) {
+		glog.Errorf("Error in moviesTable handler: %s", err)
+		http.Error(w, fmt.Sprint("Failed to fetch movie names"), http.StatusInternalServerError)
+	}
+
+	// Reads the movies table to get all the movie names and downloads
+	rows, err := selectStatements["getMovies"].Query()
+	if err != nil {
+		httpError(err)
+		return
+	}
+	movies := make([]movieRow, 0)
+	for rows.Next() {
+		var r movieRow
+		if err = rows.Scan(&r.Name, &r.Downloads); err != nil {
+			httpError(err)
+			return
+		}
+		movies = append(movies, r)
+	}
+	if err = rows.Err(); err != nil {
+		httpError(err)
+		return
+	}
+
+	// Marshalls the movies slice into an array of JSON objects
+	jsonData, err := json.Marshal(movies)
+	if err != nil {
+		httpError(err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprint(w, string(jsonData))
+}
+
+// Serves the movie identified by the given pathname, incrementing the
+// download count. *moviePath should not be in the url
+func movieHandler(w http.ResponseWriter, r *http.Request) {
 	if err := checkAccess(w, r); err != nil {
 		glog.Error(err)
 		return
 	}
 
-	filename := r.URL.Path[len(fetchPath):]
+	filename := r.URL.Path[len(movieURL):]
 	filelocation := *moviePath + "/" + filename
 	glog.V(infolevel).Infof("Fetching file: %s", filelocation)
 	f, err := os.Open(filelocation)
@@ -120,7 +143,7 @@ func fetchHandler(w http.ResponseWriter, r *http.Request) {
 	// Updates the download count, if no rows were affected, it
 	// should have thrown the "could not serve file" error, so it
 	// panics here
-	res, err := insertStatements["addDownload"].Exec(filename)
+	res, err := insertStatements["addDownload"].Exec(*moviePath, filename)
 	if err != nil {
 		glog.Errorf("Error updating download count for %s: %s", filename, err)
 	}
@@ -131,4 +154,10 @@ func fetchHandler(w http.ResponseWriter, r *http.Request) {
 	if rowcount == 0 {
 		panic("Update changed 0 rows, so it should have thrown an error above")
 	}
+}
+
+func installHandlers() {
+	http.HandleFunc(mainURL, mainHandler)
+	http.HandleFunc(moviesTableURL, moviesTableHandler)
+	http.HandleFunc(movieURL, movieHandler)
 }

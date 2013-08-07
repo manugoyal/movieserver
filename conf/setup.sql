@@ -7,15 +7,19 @@ USE movieserver
 --#DROP TABLE IF EXISTS ips
 ----------
 CREATE TABLE IF NOT EXISTS ips(
-	address varchar(255) primary key,
-	registered timestamp default current_timestamp,
-	key registered(registered)
+	address VARCHAR(255) PRIMARY KEY,
+	registered TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+	KEY registered(registered)
 	)
 ----------
 --#DROP TABLE IF EXISTS movies
 ----------
 CREATE TABLE IF NOT EXISTS movies(
-	name varchar(255) primary key,
-	downloads bigint unsigned default 0,
-	key downloads(downloads)
+	path VARCHAR(255),
+	name VARCHAR(255),
+	downloads BIGINT UNSIGNED DEFAULT 0,
+	present BOOL DEFAULT TRUE,
+	PRIMARY KEY (path, name),
+	KEY downloads(downloads),
+	KEY present(present)
 	)
