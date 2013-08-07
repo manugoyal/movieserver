@@ -117,9 +117,14 @@ func compileSQL() error {
 	if selectStatements["getMovies"], err = dbHandle.Prepare(getNames); err != nil {
 		return err
 	}
-	// getAddr selects the ip addresses that matches a given value
-	const getAddr = "SELECT address from ips WHERE address = ?"
-	if selectStatements["getAddr"], err = dbHandle.Prepare(getAddr); err != nil {
+	// getUser selects the user that matches a given value
+	const getUser = "SELECT users from setup WHERE users = ?"
+	if selectStatements["getUser"], err = dbHandle.Prepare(getUser); err != nil {
+		return err
+	}
+	// getPass selects the password that matches a given value
+	const getPass = "SELECT passwords from setup WHERE passwords = ?"
+	if selectStatements["getPassword"], err = dbHandle.Prepare(getPass); err != nil {
 		return err
 	}
 

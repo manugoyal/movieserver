@@ -29,39 +29,39 @@ import (
 
 const (
 	imagePath = "images/"
-	mainPath = "/"
+	loginPath = "/"
+	mainPath = "/main/"
 	fetchPath = "/fetch/"
 )
 
 // Makes sure that the request's ip is allowed. Sends an error message
 // if it isn't. Returns an error if it isn't
-func checkAccess(w http.ResponseWriter, r *http.Request) error {
-	ipstr := r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")]
-	row := selectStatements["getAddr"].QueryRow(ipstr)
+func checkAccessHandler(w http.ResponseWriter, r *http.Request) {
+	if err = runTemplate("login",w,blank:=make([]int,0)); err != nil {
+		http.Error(err)
+	} 
+	user = r.FormValue("username")
+	password = r.FormValue("password")
+	row := selectStatements["getUser"].QueryRow(user)
 	var throwaway string
 	if err := row.Scan(&throwaway); err != nil {
 		glog.Error(err)
 		http.Error(w, "You do not have access to this site", http.StatusServiceUnavailable)
-		return fmt.Errorf("IP %s was not found", ipstr)
+		return fmt.Errorf("User %s not found", user)
 	}
-	return nil
-}
-
-type movieRow struct {
-	Name string
-	Downloads uint64
+	row = selectStatements["getPassword"].QueryRow(password)
+	if err := row.Scan(&throwaway); err != nil {
+		glog.Error(err)
+		http.Error(w, "Go away. You or retype your password correctly.", http.StatusServiceUnavailable)
+		return fmt.Errorf("Password incorrect")
+	}
+	http.Redirect(w,r,mainPath,http.StatusFound)
 }
 
 // If the URL is empty (just "/"), then it serves the index template
 // with the movie names from the movies table. Otherwise, it serves
 // the file named by the path
 func mainHandler(w http.ResponseWriter, r *http.Request) {
-	if err := checkAccess(w, r); err != nil {
-		glog.Error(err)
-		return
-	}
-
-	if len(r.URL.Path) == 1 {
 		httpError := func(err error) {
 			glog.Errorf("Error in main handler: %s", err)
 			http.Error(w, fmt.Sprint("Failed to fetch movie names"), http.StatusInternalServerError)
@@ -96,10 +96,6 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 // Serves the specified file, incrementing the download count.
 // *moviePath should not be in the url
 func fetchHandler(w http.ResponseWriter, r *http.Request) {
-	if err := checkAccess(w, r); err != nil {
-		glog.Error(err)
-		return
-	}
 
 	filename := r.URL.Path[len(fetchPath):]
 	filelocation := *moviePath + "/" + filename
