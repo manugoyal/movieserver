@@ -119,7 +119,7 @@ func main() {
 	}
 
 	glog.V(infoLevel).Info("Fetching html templates")
-	if err := fetchTemplates("index"); err != nil {
+	if err := fetchTemplates("login", "index"); err != nil {
 		glog.Error(err)
 		return
 	}

@@ -21,7 +21,6 @@ import (
 	"github.com/golang/glog"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 	"os"
 	"io"
@@ -29,44 +28,46 @@ import (
 )
 
 const (
-	mainURL = "/"
-	moviesTableURL = "/table/movies"
-	movieURL = "/movie/"
+	mainURL = "/main/"
+	moviesTableURL = mainURL + "table/movies"
+	movieURL = mainURL + "movie/"
+	loginURL = "/"
+	checkAccessURL = "/checkAccess/"
 )
 
-// Makes sure that the request's ip is allowed. Sends an error message
-// if it isn't. Returns an error if it isn't
-func checkAccess(w http.ResponseWriter, r *http.Request) error {
-	if *unblockIPs {
-		return nil
+// Launches the login template when the user opens up http://[ip]:[port]/
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	if err := runTemplate("login", w, nil); err != nil {
+		glog.Error(err)
+		http.Error(w, "Failed to fetch login page", http.StatusInternalServerError)
 	}
-	ipstr := r.RemoteAddr[:strings.LastIndex(r.RemoteAddr, ":")]
-	row := selectStatements["getAddr"].QueryRow(ipstr)
+}
+
+// Makes sure client has valid username and password submitted
+// on the login page. If not, an error message will be returned.
+func checkAccessHandler(w http.ResponseWriter, r *http.Request) {
+	user, password := r.FormValue("username"), r.FormValue("password")
+	row := selectStatements["getUserAndPassword"].QueryRow(user, password)
 	var throwaway string
 	if err := row.Scan(&throwaway); err != nil {
 		glog.Error(err)
-		http.Error(w, "You do not have access to this site", http.StatusServiceUnavailable)
-		return fmt.Errorf("IP %s was not found", ipstr)
+		http.Error(w, "Invalid username or password", http.StatusServiceUnavailable)
+		return
 	}
-	return nil
+	http.Redirect(w, r, mainURL, http.StatusFound)
 }
 
 type movieRow struct {
 	Name string
 	Downloads uint64
 }
-
-// If the URL is empty (just "/"), then it serves the index template.
-// Otherwise, it serves the file named by the path.
+// If the URL is empty (just mainURL), then it serves the index
+// template. Otherwise, it serves the file named by the path
 func mainHandler(w http.ResponseWriter, r *http.Request) {
-	if err := checkAccess(w, r); err != nil {
-		glog.Error(err)
-		return
-	}
 	if len(r.URL.Path) == len(mainURL) {
 		if err := runTemplate("index", w, nil); err != nil {
 			glog.Error(err)
-			http.Error(w, fmt.Sprint("Failed to fetch home page"), http.StatusInternalServerError)
+			http.Error(w, "Failed to fetch home page", http.StatusInternalServerError)
 		}
 	} else {
 		http.ServeFile(w, r, *srcPath + "/" + r.URL.Path[len(mainURL):])
@@ -76,10 +77,6 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 // Serves the movies and downloads that are present from the movies
 // table as a JSON object
 func moviesTableHandler(w http.ResponseWriter, r *http.Request) {
-	if err := checkAccess(w, r); err != nil {
-		glog.Error(err)
-		return
-	}
 	httpError := func(err error) {
 		glog.Errorf("Error in moviesTable handler: %s", err)
 		http.Error(w, fmt.Sprint("Failed to fetch movie names"), http.StatusInternalServerError)
@@ -119,11 +116,6 @@ func moviesTableHandler(w http.ResponseWriter, r *http.Request) {
 // Serves the movie identified by the given pathname, incrementing the
 // download count. *moviePath should not be in the url
 func movieHandler(w http.ResponseWriter, r *http.Request) {
-	if err := checkAccess(w, r); err != nil {
-		glog.Error(err)
-		return
-	}
-
 	filename := r.URL.Path[len(movieURL):]
 	filelocation := *moviePath + "/" + filename
 	glog.V(infoLevel).Infof("Fetching file: %s", filelocation)
@@ -160,4 +152,6 @@ func installHandlers() {
 	http.HandleFunc(mainURL, mainHandler)
 	http.HandleFunc(moviesTableURL, moviesTableHandler)
 	http.HandleFunc(movieURL, movieHandler)
+	http.HandleFunc(loginURL, loginHandler)
+	http.HandleFunc(checkAccessURL, checkAccessHandler)
 }

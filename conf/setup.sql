@@ -23,3 +23,11 @@ CREATE TABLE IF NOT EXISTS movies(
 	KEY downloads(downloads),
 	KEY present(present)
 	)
+----------
+--#DROP TABLE IF EXISTS login
+----------
+CREATE TABLE IF NOT EXISTS login(
+	user VARCHAR(255),
+	password VARCHAR(255),
+	PRIMARY KEY (user, password)
+	)
