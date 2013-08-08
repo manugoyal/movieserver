@@ -44,31 +44,33 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 // Makes sure client has valid username and password submitted
 // on the login page. If not, an error message will be returned.
 func checkAccessHandler(w http.ResponseWriter, r *http.Request) {	
-	user := r.FormValue("username")
+	var user string
+	user = r.FormValue("username")
+	fmt.Println(user)
 	//password := r.FormValue("password")
 	row := selectStatements["getUserAndPassword"].QueryRow(user)
 	var throwaway string
 	if err := row.Scan(&throwaway); err != nil {
 		glog.Error(err)
+		fmt.Println(throwaway)
 		http.Error(w, "Invalid username or passoword", http.StatusServiceUnavailable)
 		return //fmt.Errorf("User %s not found or password incorrect", user)
 	}
 	
 	http.Redirect(w, r, mainPath, http.StatusFound)
 }
-
+type movieRow struct {
+	Name string
+	Downloads uint64
+	}
 // If the URL is empty (just "/"), then it serves the index template
 // with the movie names from the movies table. Otherwise, it serves
 // the file named by the path
 func mainHandler(w http.ResponseWriter, r *http.Request) {
-	if len(r.URL.Path) == 1 {
+	if len(r.URL.Path) == len(mainPath) {
 		httpError := func(err error) {
 			glog.Errorf("Error in main handler: %s", err)
 			http.Error(w, fmt.Sprint("Failed to fetch movie names"), http.StatusInternalServerError)
-		}
-		type movieRow struct {
-			Name string
-			Downloads uint64
 		}
 		// Reads the movies table to get all the movie names and downloads
 		rows, err := selectStatements["getMovies"].Query()

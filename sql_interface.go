@@ -139,18 +139,26 @@ func cleanupDB() {
 	glog.V(infolevel).Info("Cleaning up DB connection")
 	const DBErrmsg = "Error during DB cleanup: %s"
 	var err error
-	for _, stmt := range(insertStatements) {
-		if err = stmt.Close(); err != nil {
-			glog.Errorf(DBErrmsg, err)
+	closeLogic := func(stmt *sql.Stmt) {
+		if stmt != nil {
+			if err = stmt.Close(); err != nil {
+				glog.Errorf(DBErrmsg, err)
+			}
 		}
 	}
+
+	for _, stmt := range(insertStatements) {
+		closeLogic(stmt)
+	}
 	for _, stmt := range(selectStatements) {
-		if err = stmt.Close(); err != nil {
-			glog.Errorf(DBErrmsg, err)
-		}
+		closeLogic(stmt)
 	}
 
 	if err = dbHandle.Close(); err != nil {
 		glog.Errorf(DBErrmsg, err)
 	}
 }
+
+
+
+
