@@ -126,7 +126,7 @@ func movieHandler(w http.ResponseWriter, r *http.Request) {
 
 	filename := r.URL.Path[len(movieURL):]
 	filelocation := *moviePath + "/" + filename
-	glog.V(infolevel).Infof("Fetching file: %s", filelocation)
+	glog.V(infoLevel).Infof("Fetching file: %s", filelocation)
 	f, err := os.Open(filelocation)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Could not serve file %s", filename), http.StatusNotFound)
@@ -138,7 +138,7 @@ func movieHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "binary/octet-stream")
 	http.ServeContent(w, r, filename, time.Time{}, rs)
-	glog.V(infolevel).Infof("Served file: %s", filelocation)
+	glog.V(infoLevel).Infof("Served file: %s", filelocation)
 
 	// Updates the download count, if no rows were affected, it
 	// should have thrown the "could not serve file" error, so it
