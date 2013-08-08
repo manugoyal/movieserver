@@ -77,7 +77,7 @@ func setupSchema() error {
 			execstmt = stmt
 		}
 		if len(execstmt) > 0 {
-			glog.V(infolevel).Infof("Executing: %s", execstmt)
+			glog.V(infoLevel).Infof("Executing: %s", execstmt)
 			_, err := dbHandle.Exec(execstmt)
 			if err != nil {
 				return err
@@ -136,7 +136,7 @@ func startupDB() error {
 
 // Closes the sql statements and the dbHandle
 func cleanupDB() {
-	glog.V(infolevel).Info("Cleaning up DB connection")
+	glog.V(infoLevel).Info("Cleaning up DB connection")
 	const DBErrmsg = "Error during DB cleanup: %s"
 	var err error
 	for _, stmt := range(insertStatements) {

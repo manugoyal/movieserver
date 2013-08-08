@@ -14,23 +14,24 @@ specific language governing permissions and limitations under the License.
  */
 
 /*
- * A movie table collection represents a table in the movieserver database
- * exports: TableCollection
+ * A pageable movie collection represents a table in the movieserver database
+ * exports: PageableMovieCollection
  */
 
-define(['backbone', 'models/movie'],
-       function(Backbone, MovieModel) {
-         var MovieTableCollection = Backbone.Collection.extend({
+define(['backbone', 'backbone_pageable'],
+       function(Backbone) {
+         var PageableCollection = require('backbone_pageable');
+         var PageableMovieCollection = PageableCollection.extend({
 
-           model: MovieModel,
+           model: Backbone.Model,
 
            url: 'table/movies',
 
-           dofetch: function() {
-                      this.fetch({reset: true});
-                    }
+           state: {pageSize: 5},
+
+           mode: "client"
 
          });
 
-         return MovieTableCollection;
+         return PageableMovieCollection;
        });

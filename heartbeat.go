@@ -27,7 +27,12 @@ import (
 	"sync"
 )
 
-const numTasks = 1
+const (
+	// The info level for heartbeat statements needs to be higher
+	// since they generate quite a bit of output
+	heartbeatInfoLevel = 2
+	numTasks = 1
+)
 
 var (
 	killTask = make(chan bool, numTasks)
@@ -37,7 +42,7 @@ var (
 // Reindexes the movies directory, setting not present to any movie
 // that isn't in the current list, and adding any new movies.
 func indexMovies() error {
-	glog.V(infolevel).Infof("Movie Indexer: indexing %s", *moviePath)
+	glog.V(heartbeatInfoLevel).Infof("Movie Indexer: indexing %s", *moviePath)
 
 	movieNames := make([]interface{}, 0)
 	// Walks through the moviePath directory and appends any movie file
@@ -84,7 +89,7 @@ func runTask(hfunc func() error, hname string, interval time.Duration) {
 	for {
 		select {
 		case <- killTask:
-			glog.V(infolevel).Infof("Exiting %s", hname)
+			glog.V(heartbeatInfoLevel).Infof("Exiting %s", hname)
 			heartbeatWG.Done()
 			return
 		default:
@@ -106,7 +111,7 @@ func startupHeartbeat() error {
 // Sticks numTasks signals on the killTask channel and waits for all
 // of them to signal on taskKilled
 func cleanupHeartbeat() {
-	glog.V(infolevel).Info("Cleaning up the heartbeat")
+	glog.V(heartbeatInfoLevel).Info("Cleaning up the heartbeat")
 	for i := 0; i < numTasks; i++ {
 		killTask <- true
 	}

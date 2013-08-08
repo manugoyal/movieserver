@@ -28,8 +28,9 @@ import (
 )
 
 const (
-	// The verbosity level necessary for info statements to be printed
-	infolevel = 1
+	// The verbosity level necessary for basic info statements to
+	// be printed
+	infoLevel = 1
 )
 
 // Looks through all the gopaths to find a possible location for the
@@ -106,27 +107,27 @@ func main() {
 	*srcPath = filepath.Clean(*srcPath)
 	*moviePath = filepath.Clean(*moviePath)
 
-	glog.V(infolevel).Info("Setting up SQL schema")
+	glog.V(infoLevel).Info("Setting up SQL schema")
 	if err := startupDB(); err != nil {
 		glog.Error(err)
 		return
 	}
-	glog.V(infolevel).Info("Starting the heartbeat")
+	glog.V(infoLevel).Info("Starting the heartbeat")
 	if err := startupHeartbeat(); err != nil {
 		glog.Error(err)
 		return
 	}
 
-	glog.V(infolevel).Info("Fetching html templates")
+	glog.V(infoLevel).Info("Fetching html templates")
 	if err := fetchTemplates("index"); err != nil {
 		glog.Error(err)
 		return
 	}
 
-	glog.V(infolevel).Info("Installing handlers")
+	glog.V(infoLevel).Info("Installing handlers")
 	installHandlers()
 
-	glog.V(infolevel).Infof("Listening on port %d\n", *port)
+	glog.V(infoLevel).Infof("Listening on port %d\n", *port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
 		glog.Error(err)
 		return

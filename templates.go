@@ -30,7 +30,7 @@ var pageTemplates = make(map[string]*template.Template)
 // parse the file
 func fetchTemplates(names ...string) (error) {
 	for _, name := range(names) {
-		t, err := template.ParseFiles(fmt.Sprintf("%s/templates/%s.html", *srcPath, name))
+		t, err := template.ParseFiles(fmt.Sprintf("%s/static/templates/%s.html", *srcPath, name))
 		if err != nil {
 			return err
 		}
