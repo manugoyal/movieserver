@@ -21,7 +21,6 @@ import (
 	"github.com/golang/glog"
 	"fmt"
 	"net/http"
-	"strings"
 	"time"
 	"os"
 	"io"
@@ -32,39 +31,44 @@ const (
 	loginPath = "/"
 	mainPath = "/main/"
 	fetchPath = "/fetch/"
+	checkAccessPath = "/checkAccess/"
 )
 
-// Makes sure that the request's ip is allowed. Sends an error message
-// if it isn't. Returns an error if it isn't
-func checkAccessHandler(w http.ResponseWriter, r *http.Request) {
-	if err = runTemplate("login",w,blank:=make([]int,0)); err != nil {
-		http.Error(err)
+// Launches the login template when the user opens up http://[ip]:[port]/
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	if err := runTemplate("login", w, nil); err != nil {
+		return
 	} 
-	user = r.FormValue("username")
-	password = r.FormValue("password")
-	row := selectStatements["getUser"].QueryRow(user)
+}
+
+// Makes sure client has valid username and password submitted
+// on the login page. If not, an error message will be returned.
+func checkAccessHandler(w http.ResponseWriter, r *http.Request) {	
+	user := r.FormValue("username")
+	//password := r.FormValue("password")
+	row := selectStatements["getUserAndPassword"].QueryRow(user)
 	var throwaway string
 	if err := row.Scan(&throwaway); err != nil {
 		glog.Error(err)
-		http.Error(w, "You do not have access to this site", http.StatusServiceUnavailable)
-		return fmt.Errorf("User %s not found", user)
+		http.Error(w, "Invalid username or passoword", http.StatusServiceUnavailable)
+		return //fmt.Errorf("User %s not found or password incorrect", user)
 	}
-	row = selectStatements["getPassword"].QueryRow(password)
-	if err := row.Scan(&throwaway); err != nil {
-		glog.Error(err)
-		http.Error(w, "Go away. You or retype your password correctly.", http.StatusServiceUnavailable)
-		return fmt.Errorf("Password incorrect")
-	}
-	http.Redirect(w,r,mainPath,http.StatusFound)
+	
+	http.Redirect(w, r, mainPath, http.StatusFound)
 }
 
 // If the URL is empty (just "/"), then it serves the index template
 // with the movie names from the movies table. Otherwise, it serves
 // the file named by the path
 func mainHandler(w http.ResponseWriter, r *http.Request) {
+	if len(r.URL.Path) == 1 {
 		httpError := func(err error) {
 			glog.Errorf("Error in main handler: %s", err)
 			http.Error(w, fmt.Sprint("Failed to fetch movie names"), http.StatusInternalServerError)
+		}
+		type movieRow struct {
+			Name string
+			Downloads uint64
 		}
 		// Reads the movies table to get all the movie names and downloads
 		rows, err := selectStatements["getMovies"].Query()

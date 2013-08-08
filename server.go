@@ -117,16 +117,13 @@ func main() {
 	}
 
 	glog.V(infolevel).Info("Fetching html templates")
-	if err := fetchTemplates("login"); err != nil {
-		glog.Error(err)
-		return
-	}
-	if err := fetchTemplates("index"); err != nil {
+	if err := fetchTemplates("login", "index"); err != nil {
 		glog.Error(err)
 		return
 	}
 
-	http.HandleFunc(loginPath, checkAccessHandler)
+	http.HandleFunc(loginPath, loginHandler)
+	http.HandleFunc(checkAccessPath, checkAccessHandler)
 	http.HandleFunc(mainPath, mainHandler)
 	http.HandleFunc(fetchPath, fetchHandler)
 

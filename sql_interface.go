@@ -117,17 +117,12 @@ func compileSQL() error {
 	if selectStatements["getMovies"], err = dbHandle.Prepare(getNames); err != nil {
 		return err
 	}
-	// getUser selects the user that matches a given value
-	const getUser = "SELECT users from setup WHERE users = ?"
-	if selectStatements["getUser"], err = dbHandle.Prepare(getUser); err != nil {
+	// getUserAndPass selects the row that matches a given value
+	const getUserAndPass = "SELECT users from login WHERE users = ?"
+	if selectStatements["getUserAndPassword"], err = dbHandle.Prepare(getUserAndPass); err != nil {
 		return err
 	}
-	// getPass selects the password that matches a given value
-	const getPass = "SELECT passwords from setup WHERE passwords = ?"
-	if selectStatements["getPassword"], err = dbHandle.Prepare(getPass); err != nil {
-		return err
-	}
-
+	
 	return nil
 }
 
