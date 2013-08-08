@@ -46,15 +46,16 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 func checkAccessHandler(w http.ResponseWriter, r *http.Request) {	
 	var user string
 	user = r.FormValue("username")
-	fmt.Println(user)
-	//password := r.FormValue("password")
-	row := selectStatements["getUserAndPassword"].QueryRow(user)
+	var password string
+	password = r.FormValue("password")
+	fmt.Println(password)
+	row := selectStatements["getUserAndPassword"].QueryRow(user, password)
 	var throwaway string
 	if err := row.Scan(&throwaway); err != nil {
 		glog.Error(err)
 		fmt.Println(throwaway)
 		http.Error(w, "Invalid username or passoword", http.StatusServiceUnavailable)
-		return //fmt.Errorf("User %s not found or password incorrect", user)
+		return 
 	}
 	
 	http.Redirect(w, r, mainPath, http.StatusFound)

@@ -118,7 +118,7 @@ func compileSQL() error {
 		return err
 	}
 	// getUserAndPass selects the row that matches a given value
-	const getUserAndPass = "SELECT users from login WHERE users = ?"
+	const getUserAndPass = "SELECT users from login WHERE users = ? AND passwords = ?"
 	if selectStatements["getUserAndPassword"], err = dbHandle.Prepare(getUserAndPass); err != nil {
 		return err
 	}
