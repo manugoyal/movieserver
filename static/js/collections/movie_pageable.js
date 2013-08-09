@@ -27,9 +27,9 @@ define(['backbone', 'backbone_pageable'],
 
            url: 'table/movies',
 
-           state: {pageSize: 5},
+           mode: "server",
 
-           mode: "client"
+           state: { pageSize: 15 }
 
          });
 

@@ -50,8 +50,8 @@ func srcdir() string {
 
 // Calls all the cleanup functions and flush the log
 func cleanupServer() {
-	cleanupDB()
 	cleanupHeartbeat()
+	cleanupDB()
 	glog.Flush()
 }
 

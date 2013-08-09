@@ -28,8 +28,7 @@ import (
 
 var (
 	dbHandle *sql.DB
-	insertStatements = make(map[string]*sql.Stmt)
-	selectStatements = make(map[string]*sql.Stmt)
+	sqlStatements = make(map[string]string)
 )
 
 // Creates a *DB handle with user root to the given database
@@ -95,35 +94,30 @@ func setupSchema() error {
 	return nil
 }
 
-// Compiles the predefined SQL statements
-func compileSQL() error {
-	var err error
+// Adds some predefined SQL statements to a map
+func buildSQLMap() {
 	// newMovie adds a movie to the movies table. If the movie is
 	// already there, it sets present to TRUE
 	const newMovie = "INSERT INTO movies(path, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE present=TRUE"
-	if insertStatements["newMovie"], err = dbHandle.Prepare(newMovie); err != nil {
-		return err
-	}
+	sqlStatements["newMovie"] = newMovie;
 	// addDownload increments the number of downloads for an
 	// existing movie. If the movie isn't there, it won't throw an
 	// error, but it will say that 0 rows were affected.
 	const addDownload = "UPDATE movies SET downloads=downloads+1 WHERE path=? AND name=?"
-	if insertStatements["addDownload"], err = dbHandle.Prepare(addDownload); err != nil {
-		return err
-	}
+	sqlStatements["addDownload"] = addDownload
 
-	// getMovies selects all the movie names and downloads from the movies table that are present
-	const getNames = "SELECT name, downloads FROM movies WHERE present = TRUE ORDER BY downloads DESC, name ASC"
-	if selectStatements["getMovies"], err = dbHandle.Prepare(getNames); err != nil {
-		return err
-	}
+	// getMovies selects all the movie names and downloads from
+	// the movies table that are present.
+	const getMovies = "SELECT name, downloads FROM movies WHERE present = TRUE"
+	sqlStatements["getMovies"] = getMovies
+
+	// getMovieNum is the same as getMovies except it's a COUNT(*) query
+	const getMovieNum = "SELECT COUNT(*) FROM movies WHERE present = TRUE"
+	sqlStatements["getMovieNum"] = getMovieNum
+
 	// getAddr selects the ip addresses that matches a given value
 	const getAddr = "SELECT address from ips WHERE address = ?"
-	if selectStatements["getAddr"], err = dbHandle.Prepare(getAddr); err != nil {
-		return err
-	}
-
-	return nil
+	sqlStatements["getAddr"] = getAddr
 }
 
 // Initializes the dbHandle, sets up the schema, and compiles the SQL
@@ -131,26 +125,14 @@ func startupDB() error {
 	if err := setupSchema(); err != nil {
 		return err
 	}
-	return compileSQL()
+	buildSQLMap()
+	return nil
 }
 
-// Closes the sql statements and the dbHandle
+// Closes the dbHandle
 func cleanupDB() {
 	glog.V(infoLevel).Info("Cleaning up DB connection")
-	const DBErrmsg = "Error during DB cleanup: %s"
-	var err error
-	for _, stmt := range(insertStatements) {
-		if err = stmt.Close(); err != nil {
-			glog.Errorf(DBErrmsg, err)
-		}
-	}
-	for _, stmt := range(selectStatements) {
-		if err = stmt.Close(); err != nil {
-			glog.Errorf(DBErrmsg, err)
-		}
-	}
-
-	if err = dbHandle.Close(); err != nil {
-		glog.Errorf(DBErrmsg, err)
+	if err := dbHandle.Close(); err != nil {
+		glog.Errorf("Error during DB cleanup: %s", err)
 	}
 }

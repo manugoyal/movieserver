@@ -23,8 +23,10 @@
   */
   Backgrid.Extension.Paginator = Backbone.View.extend({
 
-    /** @property */
-    className: "backgrid-paginator",
+    /* Rather than use the backgrid-paginator class, which squished
+    really large page numbers together, I found the bootstrap
+    pagination class to work better. So I took away this class and
+    gave the ul a pagination class */
 
     /** @property */
     windowSize: 10,
@@ -41,7 +43,7 @@
     },
 
     /** @property */
-    template: _.template('<ul><% _.each(handles, function (handle) { %><li <% if (handle.className) { %>class="<%= handle.className %>"<% } %>><a href="#" <% if (handle.title) {%> title="<%= handle.title %>"<% } %>><%= handle.label %></a></li><% }); %></ul>'),
+    template: _.template('<ul class="pagination"><% _.each(handles, function (handle) { %><li <% if (handle.className) { %>class="<%= handle.className %>"<% } %>><a href="#" <% if (handle.title) {%> title="<%= handle.title %>"<% } %>><%= handle.label %></a></li><% }); %></ul>'),
 
     /** @property */
     events: {

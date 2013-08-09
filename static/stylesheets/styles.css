@@ -1,3 +1,10 @@
+@import "bootstrap.css";
+
+@import "backgrid.css";
+
+@import "backgrid-paginator-custom.css";
+
+@import "backgrid-filter.css";
 /*
 Copyright 2013 Manu Goyal
 
@@ -12,31 +19,20 @@ under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
 CONDITIONS OF ANY KIND, either express or implied.  See the License for the
 specific language governing permissions and limitations under the License.
 */
-
-@import "bootstrap.css";
-@import "backgrid.css";
-@import "backgrid-paginator-custom.css";
-@import "backgrid-filter.css";
-
-
 body {
-    @gentle-white: #FFFFFA;
-    background-color: @gentle-white !important;
+  background-color: #fffffa !important;
 }
-
 .container {
-    padding-left:30px;
-    padding-top:10px;
-    padding-bottom:10px;
+  padding-left: 30px;
+  padding-top: 10px;
+  padding-bottom: 10px;
 }
-
 .centered {
-    text-align:center;
+  text-align: center;
 }
-
 #refreshSpan {
-    padding-top:0px;
-    padding-bottom:0px;
-    border: 0px;
-    background-color: transparent;
+  padding-top: 0px;
+  padding-bottom: 0px;
+  border: 0px;
+  background-color: transparent;
 }
