@@ -24,6 +24,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -33,6 +34,19 @@ const (
 	movieURL       = mainURL + "movie/"
 	loginURL       = "/"
 	checkAccessURL = "/checkAccess/"
+)
+
+var (
+	// Since running COUNT(*) on a very large movie entry set can
+	// take a while, we store a mapping from where clauses to
+	// index size, so that we don't have to rerun the COUNT(*)
+	// when we're on the same movie set on a where clause we've
+	// already seen. Every time indexMovies run, it will clear
+	// this map, since it's creating a new movie set. This is
+	// okay, because this map is really only useful for very large
+	// movie sets, and reindexing very large indexes takes a
+	// while, so it would be cleared infrequently
+	fileIndexCount = make(map[string]uint64)
 )
 
 // Launches the login template when the user opens up http://[ip]:[port]/
@@ -47,7 +61,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 // on the login page. If not, an error message will be returned.
 func checkAccessHandler(w http.ResponseWriter, r *http.Request) {
 	user, password := r.FormValue("username"), r.FormValue("password")
-	row := selectStatements["getUserAndPassword"].QueryRow(user, password)
+	row := dbHandle.QueryRow(sqlStatements["getUserAndPassword"], user, password)
 	var throwaway string
 	if err := row.Scan(&throwaway); err != nil {
 		glog.Error(err)
@@ -75,21 +89,142 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Replaces * with % and ? with _, handling escaping correctly
+func convertFilterString(filterString []byte) (result []byte) {
+	result = make([]byte, len(filterString))
+	for fInd := 0; fInd < len(filterString); fInd++ {
+		switch filterString[fInd] {
+		case '*':
+			result[fInd] = '%'
+		case '?':
+			result[fInd] = '_'
+		default:
+			result[fInd] = filterString[fInd]
+		}
+		// If it's a backslash, we copy the next character verbatim
+		if filterString[fInd] == '\\' && fInd+1 < len(filterString) {
+			result[fInd+1] = filterString[fInd+1]
+			fInd++
+		}
+	}
+	return
+}
+
+type paramPair struct {
+	paramString string
+	paramArgs   []interface{}
+}
+
+// Returns a map of clauses to a pair of the string of the clause and
+// its query params
+func addQueryParams(r *http.Request) (map[string]paramPair, error) {
+	paramMap := make(map[string]paramPair)
+	queryParams := r.URL.Query()
+	// We implement searching via LIKE. REGEXP is too slow, since
+	// it can't use an index. Since the filter uses wildcard
+	// syntax, * corresponds to % and ? corresponds to _. We also
+	// treat it as a prefix search, so we append a % to the string
+	// always
+	if filterString := queryParams.Get("q"); filterString != "" {
+		fixedString := string(convertFilterString([]byte(filterString))) + "%"
+		paramMap["where"] = paramPair{" AND path = ? AND name LIKE ?",
+			[]interface{}{*moviePath, fixedString}}
+	}
+
+	if page, per_page := queryParams.Get("page"), queryParams.Get("per_page"); page != "" &&
+		per_page != "" {
+		page_num, err := strconv.ParseUint(page, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		per_page_num, err := strconv.ParseUint(per_page, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		paramMap["limit"] = paramPair{" LIMIT ?, ?",
+			[]interface{}{(page_num - 1) * per_page_num, per_page_num}}
+	}
+
+	return paramMap, nil
+}
+
 // Serves the movies and downloads that are present from the movies
-// table as a JSON object
+// table as a JSON object. It returns pagination settings for the
+// client side paginator in the JSON object as well.
 func moviesTableHandler(w http.ResponseWriter, r *http.Request) {
+	// No committing any reindexes from the heartbeat in between
+	// queries here
+	heartbeatLocks.fileIndexLock.Lock()
+	defer heartbeatLocks.fileIndexLock.Unlock()
+
 	httpError := func(err error) {
 		glog.Errorf("Error in moviesTable handler: %s", err)
 		http.Error(w, fmt.Sprint("Failed to fetch movie names"), http.StatusInternalServerError)
 	}
 
-	// Reads the movies table to get all the movie names and downloads
-	rows, err := selectStatements["getMovies"].Query()
+	// Get any additional query params as a query string
+	paramMap, err := addQueryParams(r)
 	if err != nil {
 		httpError(err)
 		return
 	}
-	movies := make([]movieRow, 0)
+
+	// We need to first get the number of entries the query will
+	// return. Sometimes, if the number of file entries decreased
+	// since the client accessed a page, they could be accessing
+	// an invalid page, so if that's the case, we change the page
+	// in paginationState to 1 and use a limit offset of 0
+	var total_entries uint64
+
+	var fileIndexKey string
+	if paramPair, ok := paramMap["where"]; ok {
+		fileIndexKey = paramPair.paramArgs[0].(string) + paramPair.paramArgs[1].(string)
+	}
+
+	if count, ok := fileIndexCount[fileIndexKey]; ok {
+		total_entries = count
+	} else {
+		// We need to run a COUNT(*) query. We only need the
+		// WHERE param arg
+		glog.V(infoLevel).Info("Running COUNT(*) over the movie index")
+		countRow := dbHandle.QueryRow(sqlStatements["getMovieNum"]+paramMap["where"].paramString,
+			paramMap["where"].paramArgs...)
+		if err := countRow.Scan(&total_entries); err != nil {
+			httpError(err)
+			return
+		}
+		// Update fileIndexCount
+		fileIndexCount[fileIndexKey] = total_entries
+	}
+
+	paginationState := map[string]interface{}{
+		"total_entries": total_entries,
+	}
+	// If there's a limit clause that's out of bounds, make the
+	// offset 0 and adjust the paginationState accordingly
+	if _, ok := paramMap["limit"]; ok {
+		paramArgs := paramMap["limit"].paramArgs
+		offset, limit := paramArgs[0].(uint64), paramArgs[1].(uint64)
+		if offset >= total_entries {
+			// We're out of bounds, change paramArgs[0] to
+			// 0, and paginationState["page"] to 1. We
+			// also need explicitly set per_page, because
+			// otherwise backbone-paginator will reset it
+			// incorrectly
+			paramArgs[0] = 0
+			paginationState["page"] = 1
+			paginationState["per_page"] = limit
+		}
+	}
+
+	rows, err := dbHandle.Query(sqlStatements["getMovies"]+paramMap["where"].paramString+paramMap["limit"].paramString,
+		append(paramMap["where"].paramArgs, paramMap["limit"].paramArgs...)...)
+	if err != nil {
+		httpError(err)
+		return
+	}
+
+	movies := make([]interface{}, 0)
 	for rows.Next() {
 		var r movieRow
 		if err = rows.Scan(&r.Name, &r.Downloads); err != nil {
@@ -103,8 +238,10 @@ func moviesTableHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Marshalls the movies slice into an array of JSON objects
-	jsonData, err := json.Marshal(movies)
+	// Marshalls the json response, which is an array describing
+	// the new pagination state plus the movies
+	jsonResponse := []interface{}{paginationState, movies}
+	jsonData, err := json.Marshal(jsonResponse)
 	if err != nil {
 		httpError(err)
 		return
@@ -136,7 +273,7 @@ func movieHandler(w http.ResponseWriter, r *http.Request) {
 	// Updates the download count, if no rows were affected, it
 	// should have thrown the "could not serve file" error, so it
 	// panics here
-	res, err := insertStatements["addDownload"].Exec(*moviePath, filename)
+	res, err := dbHandle.Exec(sqlStatements["addDownload"], *moviePath, filename)
 	if err != nil {
 		glog.Errorf("Error updating download count for %s: %s", filename, err)
 	}

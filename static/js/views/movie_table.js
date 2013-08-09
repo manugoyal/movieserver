@@ -55,10 +55,11 @@ define(['jquery', 'backbone', 'collections/movie_pageable', 'backgrid', 'views/m
              this.paginator = new Backgrid.Extension.Paginator({
                collection: this.grid.collection
              });
-             this.$('#tableBox').append(this.paginator.$el);
+             this.$('#paginatorBox').append(this.paginator.$el);
 
-             this.filter = new Backgrid.Extension.ClientSideFilter({
-               collection: this.grid.collection.fullCollection,
+             this.filter = new Backgrid.Extension.ServerSideFilter({
+               collection: this.grid.collection,
+               placeholder: "Filter by name",
                fields: ['Name']
              });
              this.$('#filterBox').append(this.filter.$el);
@@ -71,8 +72,8 @@ define(['jquery', 'backbone', 'collections/movie_pageable', 'backgrid', 'views/m
            },
 
            _on_refreshbutton: function() {
-             // Clears the filter box before refreshing
-             $('.close').trigger('click');
+             // Goes back to page one before refreshing
+             this.grid.collection.state.currentPage = 1;
              this.refresh();
            },
 

@@ -18,11 +18,9 @@ specific language governing permissions and limitations under the License.
 package main
 
 import (
-	"fmt"
 	"github.com/golang/glog"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 )
@@ -35,18 +33,24 @@ const (
 )
 
 var (
-	killTask    = make(chan bool, numTasks)
-	heartbeatWG sync.WaitGroup
+	killTask       = make(chan bool, numTasks)
+	heartbeatWG    sync.WaitGroup
+	heartbeatLocks struct {
+		// When executing separate select queries over the
+		// movie entries, we sometimes don't want the size to
+		// change in between queries
+		fileIndexLock sync.Mutex
+	}
 )
 
 // Reindexes the movies directory, setting not present to any movie
-// that isn't in the current list, and adding any new movies.
+// that isn't in the current list, and adding any new movies
 func indexMovies() error {
 	glog.V(heartbeatInfoLevel).Infof("Movie Indexer: indexing %s", *moviePath)
 
 	movieNames := make([]interface{}, 0)
-	// Walks through the moviePath directory and appends any movie file
-	// names to movieNames
+	// Walks through the moviePath directory and appends any movie
+	// file names to movieNames
 	movieWalkFn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -62,23 +66,39 @@ func indexMovies() error {
 		return err
 	}
 
-	// Sets present for any movies that aren't in movieNames to FALSE
-	if len(movieNames) == 0 {
-		_, err = dbHandle.Exec("UPDATE movies SET present=FALSE")
-		return err
-	}
-	placeholderStr := strings.Repeat("?, ", len(movieNames)-1) + "?"
-	arguments := append([]interface{}{*moviePath}, movieNames...)
-	if _, err = dbHandle.Exec(fmt.Sprintf("UPDATE movies SET present=FALSE WHERE path != ? OR name NOT IN (%s)", placeholderStr), arguments...); err != nil {
+	// Sets all movies to non-present, then adds all the movies in
+	// moviePath, which should also set existing movies back to
+	// present=TRUE. It does this in one transaction, so it
+	// doesn't screw up current the present table count
+
+	trans, err := dbHandle.Begin()
+	if err != nil {
 		return err
 	}
 
-	// Adds all the movies in movieNames
+	if _, err = trans.Exec("UPDATE movies SET present=FALSE"); err != nil {
+		trans.Rollback()
+		return err
+	}
+
+	// Adds all the movies in movieNames, existing movies should
+	// get set to present=True
 	for _, name := range movieNames {
-		if _, err = insertStatements["newMovie"].Exec(*moviePath, name); err != nil {
+		if _, err = trans.Exec(sqlStatements["newMovie"], *moviePath, name); err != nil {
+			trans.Rollback()
 			return err
 		}
 	}
+
+	// Takes the fileIndex lock when updating the movie entry set
+	heartbeatLocks.fileIndexLock.Lock()
+	defer heartbeatLocks.fileIndexLock.Unlock()
+	if err := trans.Commit(); err != nil {
+		return err
+	}
+	// Clears the fileIndexCount
+	fileIndexCount = make(map[string]uint64)
+
 	return nil
 }
 
@@ -111,7 +131,7 @@ func startupHeartbeat() error {
 // Sticks numTasks signals on the killTask channel and waits for all
 // of them to signal on taskKilled
 func cleanupHeartbeat() {
-	glog.V(heartbeatInfoLevel).Info("Cleaning up the heartbeat")
+	glog.V(infoLevel).Info("Cleaning up the heartbeat")
 	for i := 0; i < numTasks; i++ {
 		killTask <- true
 	}

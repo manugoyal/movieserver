@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS ips(
 --#DROP TABLE IF EXISTS movies
 ----------
 CREATE TABLE IF NOT EXISTS movies(
-	path VARCHAR(255),
-	name VARCHAR(255),
+	path VARCHAR(767),
+	name VARCHAR(767),
 	downloads BIGINT UNSIGNED DEFAULT 0,
 	present BOOL DEFAULT TRUE,
 	PRIMARY KEY (path, name),
