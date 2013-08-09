@@ -30,7 +30,9 @@ import (
 const (
 	// The verbosity level necessary for basic info statements to
 	// be printed
-	infoLevel = 1
+	vLevel = 1
+	// The info level for extra verbose statements
+	vvLevel = 2
 )
 
 // Looks through all the gopaths to find a possible location for the
@@ -46,13 +48,6 @@ func srcdir() string {
 		}
 	}
 	return movieserverExt
-}
-
-// Calls all the cleanup functions and flush the log
-func cleanupServer() {
-	cleanupHeartbeat()
-	cleanupDB()
-	glog.Flush()
 }
 
 // Monitors for interrupt signals and, upon getting one, calls
@@ -78,8 +73,51 @@ var (
 	moviePath     = flag.String("movie-path", "", "REQUIRED: The path of the movies directory")
 	port          = flag.Uint64("port", 8080, "The port to listen on")
 	refreshSchema = flag.Bool("refresh-schema", false, "If true, the server will drop and recreate the database schema")
-	unblockIPs    = flag.Bool("unblock-ips", false, "If true, the server will not restrict access to the allowed IP addresses")
 )
+
+// Sets everything up and listens on the given port
+func startupServer() {
+	// If we exit this function prematurely or get interrupted, we
+	// still want to run cleanup
+	interruptHandler()
+	defer cleanupServer()
+
+	*srcPath = filepath.Clean(*srcPath)
+	*moviePath = filepath.Clean(*moviePath)
+
+	glog.V(vLevel).Info("Setting up SQL schema")
+	if err := startupDB(); err != nil {
+		glog.Error(err)
+		return
+	}
+	glog.V(vLevel).Info("Starting the heartbeat")
+	if err := startupHeartbeat(); err != nil {
+		glog.Error(err)
+		return
+	}
+
+	glog.V(vLevel).Info("Fetching html templates")
+	if err := fetchTemplates("login", "index"); err != nil {
+		glog.Error(err)
+		return
+	}
+
+	glog.V(vLevel).Info("Installing handlers")
+	installHandlers()
+
+	glog.V(vLevel).Infof("Listening on port %d\n", *port)
+	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
+		glog.Error(err)
+		return
+	}
+}
+
+// Calls all the cleanup functions and flushes the log
+func cleanupServer() {
+	cleanupHeartbeat()
+	cleanupDB()
+	glog.Flush()
+}
 
 func main() {
 	// Sets some defaults and parses the flags
@@ -97,39 +135,8 @@ func main() {
 		return
 	}
 
-	// Sets up the threads and interrupt handler
+	// Makes it utilize multiple cores
 	runtime.GOMAXPROCS(runtime.NumCPU())
-	interruptHandler()
-	// If we exit this function prematurely, we still want to run
-	// cleanup
-	defer cleanupServer()
-
-	*srcPath = filepath.Clean(*srcPath)
-	*moviePath = filepath.Clean(*moviePath)
-
-	glog.V(infoLevel).Info("Setting up SQL schema")
-	if err := startupDB(); err != nil {
-		glog.Error(err)
-		return
-	}
-	glog.V(infoLevel).Info("Starting the heartbeat")
-	if err := startupHeartbeat(); err != nil {
-		glog.Error(err)
-		return
-	}
-
-	glog.V(infoLevel).Info("Fetching html templates")
-	if err := fetchTemplates("login", "index"); err != nil {
-		glog.Error(err)
-		return
-	}
-
-	glog.V(infoLevel).Info("Installing handlers")
-	installHandlers()
-
-	glog.V(infoLevel).Infof("Listening on port %d\n", *port)
-	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {
-		glog.Error(err)
-		return
-	}
+	// Starts the server
+	startupServer()
 }

@@ -9,6 +9,15 @@ Dependencies
 The server component is written entirely in Go, and requires version
 &gt;= 1.1
 
+The tests are written in python and utilize the *pytest*, *MySQLdb*,
+and *Requests* packages. They can be installed with pip or easy_install:
+
+    $ pip install pytest mysql-python requests
+
+Or
+
+    $ easy_install pytest mysql-python requests
+
 Installation
 =============
 

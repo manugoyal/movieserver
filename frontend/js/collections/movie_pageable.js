@@ -25,7 +25,7 @@ define(['backbone', 'backbone_pageable'],
 
            model: Backbone.Model,
 
-           url: 'table/movies',
+           url: 'table/movie',
 
            mode: "server",
 

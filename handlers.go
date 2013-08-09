@@ -30,7 +30,7 @@ import (
 
 const (
 	mainURL        = "/main/"
-	moviesTableURL = mainURL + "table/movies"
+	movieTableURL  = mainURL + "table/movie"
 	movieURL       = mainURL + "movie/"
 	loginURL       = "/"
 	checkAccessURL = "/checkAccess/"
@@ -65,7 +65,7 @@ func checkAccessHandler(w http.ResponseWriter, r *http.Request) {
 	var throwaway string
 	if err := row.Scan(&throwaway); err != nil {
 		glog.Error(err)
-		http.Error(w, "Invalid username or password", http.StatusServiceUnavailable)
+		http.Error(w, "Invalid username or password", http.StatusForbidden)
 		return
 	}
 	http.Redirect(w, r, mainURL, http.StatusFound)
@@ -115,8 +115,10 @@ type paramPair struct {
 	paramArgs   []interface{}
 }
 
-// Returns a map of clauses to a pair of the string of the clause and
-// its query params
+// Looking at the form values in a request, it returns a map of SQL
+// clauses to a pair of the string of the clause and its query params.
+// So far it checks for q (a filter string), and page and per_page
+// (paging info)
 func addQueryParams(r *http.Request) (map[string]paramPair, error) {
 	paramMap := make(map[string]paramPair)
 	queryParams := r.URL.Query()
@@ -148,17 +150,17 @@ func addQueryParams(r *http.Request) (map[string]paramPair, error) {
 	return paramMap, nil
 }
 
-// Serves the movies and downloads that are present from the movies
+// Serves the movies and downloads that are present from the movie
 // table as a JSON object. It returns pagination settings for the
 // client side paginator in the JSON object as well.
-func moviesTableHandler(w http.ResponseWriter, r *http.Request) {
+func movieTableHandler(w http.ResponseWriter, r *http.Request) {
 	// No committing any reindexes from the heartbeat in between
 	// queries here
 	heartbeatLocks.fileIndexLock.Lock()
 	defer heartbeatLocks.fileIndexLock.Unlock()
 
 	httpError := func(err error) {
-		glog.Errorf("Error in moviesTable handler: %s", err)
+		glog.Errorf("Error in movieTable handler: %s", err)
 		http.Error(w, fmt.Sprint("Failed to fetch movie names"), http.StatusInternalServerError)
 	}
 
@@ -186,7 +188,7 @@ func moviesTableHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// We need to run a COUNT(*) query. We only need the
 		// WHERE param arg
-		glog.V(infoLevel).Info("Running COUNT(*) over the movie index")
+		glog.V(vvLevel).Info("Running COUNT(*) over the movie index")
 		countRow := dbHandle.QueryRow(sqlStatements["getMovieNum"]+paramMap["where"].paramString,
 			paramMap["where"].paramArgs...)
 		if err := countRow.Scan(&total_entries); err != nil {
@@ -206,11 +208,11 @@ func moviesTableHandler(w http.ResponseWriter, r *http.Request) {
 		paramArgs := paramMap["limit"].paramArgs
 		offset, limit := paramArgs[0].(uint64), paramArgs[1].(uint64)
 		if offset >= total_entries {
-			// We're out of bounds, change paramArgs[0] to
-			// 0, and paginationState["page"] to 1. We
-			// also need explicitly set per_page, because
-			// otherwise backbone-paginator will reset it
-			// incorrectly
+			// We're out of bounds, change paramArgs[0]
+			// (offset) to 0, and paginationState["page"]
+			// to 1. We also need explicitly set per_page,
+			// because otherwise backbone-paginator will
+			// reset it incorrectly
 			paramArgs[0] = 0
 			paginationState["page"] = 1
 			paginationState["per_page"] = limit
@@ -256,7 +258,7 @@ func moviesTableHandler(w http.ResponseWriter, r *http.Request) {
 func movieHandler(w http.ResponseWriter, r *http.Request) {
 	filename := r.URL.Path[len(movieURL):]
 	filelocation := *moviePath + "/" + filename
-	glog.V(infoLevel).Infof("Fetching file: %s", filelocation)
+	glog.V(vLevel).Infof("Fetching file: %s", filelocation)
 	f, err := os.Open(filelocation)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Could not serve file %s", filename), http.StatusNotFound)
@@ -268,7 +270,7 @@ func movieHandler(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "binary/octet-stream")
 	http.ServeContent(w, r, filename, time.Time{}, rs)
-	glog.V(infoLevel).Infof("Served file: %s", filelocation)
+	glog.V(vLevel).Infof("Served file: %s", filelocation)
 
 	// Updates the download count, if no rows were affected, it
 	// should have thrown the "could not serve file" error, so it
@@ -288,7 +290,7 @@ func movieHandler(w http.ResponseWriter, r *http.Request) {
 
 func installHandlers() {
 	http.HandleFunc(mainURL, mainHandler)
-	http.HandleFunc(moviesTableURL, moviesTableHandler)
+	http.HandleFunc(movieTableURL, movieTableHandler)
 	http.HandleFunc(movieURL, movieHandler)
 	http.HandleFunc(loginURL, loginHandler)
 	http.HandleFunc(checkAccessURL, checkAccessHandler)

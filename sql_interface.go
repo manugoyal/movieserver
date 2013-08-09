@@ -76,7 +76,7 @@ func setupSchema() error {
 			execstmt = stmt
 		}
 		if len(execstmt) > 0 {
-			glog.V(infoLevel).Infof("Executing: %s", execstmt)
+			glog.V(vLevel).Infof("Executing: %s", execstmt)
 			_, err := dbHandle.Exec(execstmt)
 			if err != nil {
 				return err
@@ -109,7 +109,6 @@ func buildSQLMap() {
 	sqlStatements["getMovies"] = "SELECT name, downloads FROM movies WHERE present = TRUE"
 
 	// getMovieNum is the same as getMovies except it's a COUNT(*) query
-
 	sqlStatements["getMovieNum"] = "SELECT COUNT(*) FROM movies WHERE present = TRUE"
 
 	// getUserAndPassword selects the row that matches a given
@@ -135,7 +134,7 @@ func startupDB() error {
 
 // Closes the dbHandle
 func cleanupDB() {
-	glog.V(infoLevel).Info("Cleaning up DB connection")
+	glog.V(vLevel).Info("Cleaning up DB connection")
 	if err := dbHandle.Close(); err != nil {
 		glog.Errorf("Error during DB cleanup: %s", err)
 	}
