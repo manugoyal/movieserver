@@ -44,17 +44,12 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 // Makes sure client has valid username and password submitted
 // on the login page. If not, an error message will be returned.
 func checkAccessHandler(w http.ResponseWriter, r *http.Request) {	
-	var user string
-	user = r.FormValue("username")
-	var password string
-	password = r.FormValue("password")
-	fmt.Println(password)
+	user, password : = r.FormValue("username"), r.FormValue("password")
 	row := selectStatements["getUserAndPassword"].QueryRow(user, password)
 	var throwaway string
 	if err := row.Scan(&throwaway); err != nil {
 		glog.Error(err)
-		fmt.Println(throwaway)
-		http.Error(w, "Invalid username or passoword", http.StatusServiceUnavailable)
+		http.Error(w, "Invalid username or password", http.StatusServiceUnavailable)
 		return 
 	}
 	

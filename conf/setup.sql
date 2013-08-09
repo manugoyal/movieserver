@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS movies(
 --#DROP TABLE IF EXISTS login
 ----------
 CREATE TABLE IF NOT EXISTS login(
-	users varchar(255),
-	passwords varchar(255),
-	primary key (users, passwords)
+	user varchar(255),
+	password varchar(255),
+	primary key (user, password)
 	)
