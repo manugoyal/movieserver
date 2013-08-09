@@ -16,18 +16,18 @@ specific language governing permissions and limitations under the License.
 // Utilitiy functions to setup and operate the mysql interface to the
 // movieserver
 
-package main;
+package main
 
 import (
 	"database/sql"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/golang/glog"
 	"io/ioutil"
 	"strings"
-	"github.com/golang/glog"
 )
 
 var (
-	dbHandle *sql.DB
+	dbHandle         *sql.DB
 	insertStatements = make(map[string]*sql.Stmt)
 	selectStatements = make(map[string]*sql.Stmt)
 )
@@ -35,7 +35,7 @@ var (
 // Creates a *DB handle with user root to the given database
 func connectRoot(dbName string) error {
 	var err error
-	dbHandle, err = sql.Open("mysql", "root@/" + dbName)
+	dbHandle, err = sql.Open("mysql", "root@/"+dbName)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func connectRoot(dbName string) error {
 }
 
 const (
-	stmtSep = "----------"
+	stmtSep       = "----------"
 	refreshPrefix = "--#"
 )
 
@@ -66,7 +66,7 @@ func setupSchema() error {
 		return err
 	}
 	statements := strings.Split(string(setupBytes), stmtSep)
-	for _, stmt := range(statements) {
+	for _, stmt := range statements {
 		stmt = strings.TrimSpace(stmt)
 		execstmt := ""
 		if strings.HasPrefix(stmt, refreshPrefix) {
@@ -147,10 +147,10 @@ func cleanupDB() {
 		}
 	}
 
-	for _, stmt := range(insertStatements) {
+	for _, stmt := range insertStatements {
 		closeLogic(stmt)
 	}
-	for _, stmt := range(selectStatements) {
+	for _, stmt := range selectStatements {
 		closeLogic(stmt)
 	}
 

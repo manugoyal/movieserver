@@ -18,24 +18,24 @@ specific language governing permissions and limitations under the License.
 package main
 
 import (
-	"path/filepath"
+	"fmt"
 	"github.com/golang/glog"
 	"os"
+	"path/filepath"
 	"strings"
-	"fmt"
-	"time"
 	"sync"
+	"time"
 )
 
 const (
 	// The info level for heartbeat statements needs to be higher
 	// since they generate quite a bit of output
 	heartbeatInfoLevel = 2
-	numTasks = 1
+	numTasks           = 1
 )
 
 var (
-	killTask = make(chan bool, numTasks)
+	killTask    = make(chan bool, numTasks)
 	heartbeatWG sync.WaitGroup
 )
 
@@ -74,7 +74,7 @@ func indexMovies() error {
 	}
 
 	// Adds all the movies in movieNames
-	for _, name := range(movieNames) {
+	for _, name := range movieNames {
 		if _, err = insertStatements["newMovie"].Exec(*moviePath, name); err != nil {
 			return err
 		}
@@ -88,7 +88,7 @@ func indexMovies() error {
 func runTask(hfunc func() error, hname string, interval time.Duration) {
 	for {
 		select {
-		case <- killTask:
+		case <-killTask:
 			glog.V(heartbeatInfoLevel).Infof("Exiting %s", hname)
 			heartbeatWG.Done()
 			return
@@ -104,7 +104,7 @@ func runTask(hfunc func() error, hname string, interval time.Duration) {
 // Starts each task at it's time interval
 func startupHeartbeat() error {
 	heartbeatWG.Add(numTasks)
-	go runTask(indexMovies, "Movie Indexer", 5 * time.Second)
+	go runTask(indexMovies, "Movie Indexer", 5*time.Second)
 	return nil
 }
 

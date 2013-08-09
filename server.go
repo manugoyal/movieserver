@@ -17,14 +17,14 @@ specific language governing permissions and limitations under the License.
 package main
 
 import (
+	"flag"
 	"fmt"
 	"github.com/golang/glog"
 	"net/http"
-	"path/filepath"
-	"flag"
 	"os"
-	"runtime"
 	"os/signal"
+	"path/filepath"
+	"runtime"
 )
 
 const (
@@ -39,7 +39,7 @@ const (
 func srcdir() string {
 	gopaths := filepath.SplitList(os.ExpandEnv("$GOPATH"))
 	movieserverExt := "/src/github.com/manugoyal/movieserver"
-	for _, path := range(gopaths) {
+	for _, path := range gopaths {
 		_, err := os.Stat(path + movieserverExt)
 		if err == nil {
 			return path + movieserverExt
@@ -74,11 +74,11 @@ func interruptHandler() {
 }
 
 var (
-	srcPath = flag.String("src-path", srcdir(), "The path of the movieserver source directory")
-	moviePath = flag.String("movie-path", "", "REQUIRED: The path of the movies directory")
-	port = flag.Uint64("port", 8080, "The port to listen on")
+	srcPath       = flag.String("src-path", srcdir(), "The path of the movieserver source directory")
+	moviePath     = flag.String("movie-path", "", "REQUIRED: The path of the movies directory")
+	port          = flag.Uint64("port", 8080, "The port to listen on")
 	refreshSchema = flag.Bool("refresh-schema", false, "If true, the server will drop and recreate the database schema")
-	unblockIPs = flag.Bool("unblock-ips", false, "If true, the server will not restrict access to the allowed IP addresses")
+	unblockIPs    = flag.Bool("unblock-ips", false, "If true, the server will not restrict access to the allowed IP addresses")
 )
 
 func main() {

@@ -15,21 +15,20 @@ specific language governing permissions and limitations under the License.
 
 // HTTP  templates
 
-package main 
+package main
 
 import (
+	"fmt"
 	"html/template"
 	"net/http"
-	"fmt"
 )
-
 
 var pageTemplates = make(map[string]*template.Template)
 
 // Gets the templates in advance, so that we don't have to repeatedly
 // parse the file
-func fetchTemplates(names ...string) (error) {
-	for _, name := range(names) {
+func fetchTemplates(names ...string) error {
+	for _, name := range names {
 		t, err := template.ParseFiles(fmt.Sprintf("%s/static/templates/%s.html", *srcPath, name))
 		if err != nil {
 			return err
@@ -52,4 +51,3 @@ func runTemplate(operationName string, w http.ResponseWriter, data interface{}) 
 	}
 	return nil
 }
-

@@ -18,20 +18,20 @@ specific language governing permissions and limitations under the License.
 package main
 
 import (
-	"github.com/golang/glog"
-	"fmt"
-	"net/http"
-	"time"
-	"os"
-	"io"
 	"encoding/json"
+	"fmt"
+	"github.com/golang/glog"
+	"io"
+	"net/http"
+	"os"
+	"time"
 )
 
 const (
-	mainURL = "/main/"
+	mainURL        = "/main/"
 	moviesTableURL = mainURL + "table/movies"
-	movieURL = mainURL + "movie/"
-	loginURL = "/"
+	movieURL       = mainURL + "movie/"
+	loginURL       = "/"
 	checkAccessURL = "/checkAccess/"
 )
 
@@ -58,9 +58,10 @@ func checkAccessHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type movieRow struct {
-	Name string
+	Name      string
 	Downloads uint64
 }
+
 // If the URL is empty (just mainURL), then it serves the index
 // template. Otherwise, it serves the file named by the path
 func mainHandler(w http.ResponseWriter, r *http.Request) {
@@ -70,7 +71,7 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to fetch home page", http.StatusInternalServerError)
 		}
 	} else {
-		http.ServeFile(w, r, *srcPath + "/" + r.URL.Path[len(mainURL):])
+		http.ServeFile(w, r, *srcPath+"/"+r.URL.Path[len(mainURL):])
 	}
 }
 
@@ -139,7 +140,7 @@ func movieHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		glog.Errorf("Error updating download count for %s: %s", filename, err)
 	}
-	rowcount, err := res.RowsAffected();
+	rowcount, err := res.RowsAffected()
 	if err != nil {
 		glog.Error("Error retrieving rows affected for addDownload query")
 	}
