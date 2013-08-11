@@ -60,20 +60,18 @@
     initialize: function (options) {
       Backgrid.requireOptions(options, ["collection"]);
 
-      /* I took out the fullCollection stuff here, because it seemed
-      to cause a bug with the newest version of the backbone-pageable
-      collection, where it wouldn't trigger the handle change when you
-      clicked on a different page. I couldn't use the old version
-      (that's an asset in the backgrid vendor lib) of
-      backbone-pageable, since that has a bug that occurs when you
-      combine the paginator and filter (it throws a RangeError instead
-      of switching to page 1 whenever you search). I don't really know
-      why disabling the fullCollection handler option works, but no
-      problems so far. */
       var collection = this.collection;
-      this.listenTo(collection, "add", this.render);
-      this.listenTo(collection, "remove", this.render);
-      this.listenTo(collection, "reset", this.render);
+      var fullCollection = collection.fullCollection;
+      if (fullCollection) {
+        this.listenTo(fullCollection, "add", this.render);
+        this.listenTo(fullCollection, "remove", this.render);
+        this.listenTo(fullCollection, "reset", this.render);
+      }
+      else {
+        this.listenTo(collection, "add", this.render);
+        this.listenTo(collection, "remove", this.render);
+        this.listenTo(collection, "reset", this.render);
+      }
     },
 
     /**
