@@ -3,3 +3,7 @@
 *~
 todo.org
 vendor
+*.test
+tests/logs/*
+*.pyc
+__pycache__

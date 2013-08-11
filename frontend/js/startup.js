@@ -14,7 +14,7 @@ specific language governing permissions and limitations under the License.
  */
 
 requirejs.config({
-  baseUrl: 'static/js/',
+  baseUrl: 'frontend/js/',
 
   paths: {
     'jquery':                'libs/jquery',

@@ -26,10 +26,7 @@ import (
 )
 
 const (
-	// The info level for heartbeat statements needs to be higher
-	// since they generate quite a bit of output
-	heartbeatInfoLevel = 2
-	numTasks           = 1
+	numTasks = 1
 )
 
 var (
@@ -46,7 +43,7 @@ var (
 // Reindexes the movies directory, setting not present to any movie
 // that isn't in the current list, and adding any new movies
 func indexMovies() error {
-	glog.V(heartbeatInfoLevel).Infof("Movie Indexer: indexing %s", *moviePath)
+	glog.V(vvLevel).Infof("Movie Indexer: indexing %s", *moviePath)
 
 	movieNames := make([]interface{}, 0)
 	// Walks through the moviePath directory and appends any movie
@@ -109,7 +106,7 @@ func runTask(hfunc func() error, hname string, interval time.Duration) {
 	for {
 		select {
 		case <-killTask:
-			glog.V(heartbeatInfoLevel).Infof("Exiting %s", hname)
+			glog.V(vvLevel).Infof("Exiting %s", hname)
 			heartbeatWG.Done()
 			return
 		default:
@@ -131,7 +128,7 @@ func startupHeartbeat() error {
 // Sticks numTasks signals on the killTask channel and waits for all
 // of them to signal on taskKilled
 func cleanupHeartbeat() {
-	glog.V(infoLevel).Info("Cleaning up the heartbeat")
+	glog.V(vLevel).Info("Cleaning up the heartbeat")
 	for i := 0; i < numTasks; i++ {
 		killTask <- true
 	}

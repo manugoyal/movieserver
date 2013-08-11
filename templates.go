@@ -20,7 +20,7 @@ package main
 import (
 	"fmt"
 	"html/template"
-	"net/http"
+	"io"
 )
 
 var pageTemplates = make(map[string]*template.Template)
@@ -29,7 +29,7 @@ var pageTemplates = make(map[string]*template.Template)
 // parse the file
 func fetchTemplates(names ...string) error {
 	for _, name := range names {
-		t, err := template.ParseFiles(fmt.Sprintf("%s/static/templates/%s.html", *srcPath, name))
+		t, err := template.ParseFiles(fmt.Sprintf("%s/frontend/templates/%s.html", *srcPath, name))
 		if err != nil {
 			return err
 		}
@@ -39,7 +39,7 @@ func fetchTemplates(names ...string) error {
 }
 
 // Executes the given template and handles any errors
-func runTemplate(operationName string, w http.ResponseWriter, data interface{}) error {
+func runTemplate(operationName string, w io.Writer, data interface{}) error {
 	t, ok := pageTemplates[operationName]
 	if !ok {
 		panic(fmt.Sprintf("Template %s doesn't exist", operationName))
