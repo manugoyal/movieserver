@@ -105,11 +105,13 @@ func buildSQLMap() {
 	sqlStatements["addDownload"] = "UPDATE movies SET downloads=downloads+1 WHERE path=? AND name=?"
 
 	// getMovies selects all the movie names and downloads from
-	// the movies table that are present.
-	sqlStatements["getMovies"] = "SELECT name, downloads FROM movies WHERE present = TRUE"
+	// the movies table that are present. The three %s's are meant
+	// for additional WHERE clauses, ORDER BY, and LIMIT
+	sqlStatements["getMovies"] = "SELECT name, downloads FROM movies WHERE present = TRUE %s %s %s"
 
-	// getMovieNum is the same as getMovies except it's a COUNT(*) query
-	sqlStatements["getMovieNum"] = "SELECT COUNT(*) FROM movies WHERE present = TRUE"
+	// getMovieNum is the same as getMovies except it's a COUNT(*)
+	// query. We don't need ORDER BY and LIMIT, though.
+	sqlStatements["getMovieNum"] = "SELECT COUNT(*) FROM movies WHERE present = TRUE %s"
 
 	// getUserAndPassword selects the row that matches a given
 	// username-password combination

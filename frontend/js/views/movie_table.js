@@ -25,13 +25,13 @@ define(['jquery', 'backbone', 'collections/movie_pageable', 'backgrid', 'views/m
 
            columns: [
              {
-               name: "Name",
+               name: "name",
                label: "Movie",
                editable: false,
                cell: MovieUri
              },
              {
-               name: "Downloads",
+               name: "downloads",
                label: "Downloads",
                editable: false,
                cell: "integer"

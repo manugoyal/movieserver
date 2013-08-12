@@ -7,3 +7,4 @@ vendor
 tests/logs/*
 *.pyc
 __pycache__
+venv

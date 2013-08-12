@@ -9,14 +9,10 @@ Dependencies
 The server component is written entirely in Go, and requires version
 &gt;= 1.1
 
-The tests are written in python and utilize the *pytest*, *MySQLdb*,
-and *Requests* packages. They can be installed with pip or easy_install:
+The tests are written with Python 2.7 and the environment is set up with
+virtualenv. To install virtualenv, run
 
-    $ pip install pytest mysql-python requests
-
-Or
-
-    $ easy_install pytest mysql-python requests
+    $ pip install virtualenv
 
 Installation
 =============
@@ -38,6 +34,10 @@ To install or update the movie server, run the following code:
 
 This should install all of the server's dependencies as well.
 
+To build the testing virtualenv, execute
+
+    $ make testdeps
+
 Usage
 =====
 
@@ -49,6 +49,17 @@ There are a number of settings you can tweak via command line flags.
 To get a complete description of the settings, run
 
     $ movieserver -help
+
+To run the tests, execute
+
+    $ make test
+
+Note: On Macs, Python may not know where to find certain MySQL client
+dylibs when importing the ``_mysql`` library. In order to fix this,
+set the ``DYLD_LIBRARY_PATH`` environment variable to the location of
+your MySQL installation's library directory (possibly
+``/usr/local/mysql/lib``)
+
 
 Licence
 =========

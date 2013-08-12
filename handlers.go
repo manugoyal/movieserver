@@ -72,8 +72,8 @@ func checkAccessHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type movieRow struct {
-	Name      string
-	Downloads uint64
+	Name      string `json:"name"`
+	Downloads uint64 `json:"downloads"`
 }
 
 // If the URL is empty (just mainURL), then it serves the index
@@ -111,14 +111,14 @@ func convertFilterString(filterString []byte) (result []byte) {
 }
 
 type paramPair struct {
-	paramString string
-	paramArgs   []interface{}
+	str string
+	args   []interface{}
 }
 
 // Looking at the form values in a request, it returns a map of SQL
 // clauses to a pair of the string of the clause and its query params.
-// So far it checks for q (a filter string), and page and per_page
-// (paging info)
+// So far it checks for q (a filter string), page and per_page
+// (paging info), and sort_by and order (sorting)
 func addQueryParams(r *http.Request) (map[string]paramPair, error) {
 	paramMap := make(map[string]paramPair)
 	queryParams := r.URL.Query()
@@ -131,10 +131,17 @@ func addQueryParams(r *http.Request) (map[string]paramPair, error) {
 		fixedString := string(convertFilterString([]byte(filterString))) + "%"
 		paramMap["where"] = paramPair{" AND path = ? AND name LIKE ?",
 			[]interface{}{*moviePath, fixedString}}
+	} else {
+		paramMap["where"] = paramPair{}
 	}
 
-	if page, per_page := queryParams.Get("page"), queryParams.Get("per_page"); page != "" &&
-		per_page != "" {
+	if sort_col, order := queryParams.Get("sort_by"), queryParams.Get("order"); len(sort_col + order) > 0 {
+		paramMap["order"] = paramPair{str:fmt.Sprintf(" ORDER BY `%s` %s", sort_col, order)}
+	} else {
+		paramMap["order"] = paramPair{}
+	}
+
+	if page, per_page := queryParams.Get("page"), queryParams.Get("per_page"); len(page + per_page) > 0 {
 		page_num, err := strconv.ParseUint(page, 10, 64)
 		if err != nil {
 			return nil, err
@@ -145,6 +152,8 @@ func addQueryParams(r *http.Request) (map[string]paramPair, error) {
 		}
 		paramMap["limit"] = paramPair{" LIMIT ?, ?",
 			[]interface{}{(page_num - 1) * per_page_num, per_page_num}}
+	} else {
+		paramMap["limit"] = paramPair{}
 	}
 
 	return paramMap, nil
@@ -178,9 +187,11 @@ func movieTableHandler(w http.ResponseWriter, r *http.Request) {
 	// in paginationState to 1 and use a limit offset of 0
 	var total_entries uint64
 
+	// First we check if the count is already in the
+	// fileIndexCount map
 	var fileIndexKey string
-	if paramPair, ok := paramMap["where"]; ok {
-		fileIndexKey = paramPair.paramArgs[0].(string) + paramPair.paramArgs[1].(string)
+	if pp := paramMap["where"]; len(pp.args) == 2 {
+		fileIndexKey = pp.args[0].(string) + pp.args[1].(string)
 	}
 
 	if count, ok := fileIndexCount[fileIndexKey]; ok {
@@ -189,8 +200,8 @@ func movieTableHandler(w http.ResponseWriter, r *http.Request) {
 		// We need to run a COUNT(*) query. We only need the
 		// WHERE param arg
 		glog.V(vvLevel).Info("Running COUNT(*) over the movie index")
-		countRow := dbHandle.QueryRow(sqlStatements["getMovieNum"]+paramMap["where"].paramString,
-			paramMap["where"].paramArgs...)
+		countRow := dbHandle.QueryRow(fmt.Sprintf(sqlStatements["getMovieNum"], paramMap["where"].str),
+			paramMap["where"].args...)
 		if err := countRow.Scan(&total_entries); err != nil {
 			httpError(err)
 			return
@@ -204,23 +215,23 @@ func movieTableHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// If there's a limit clause that's out of bounds, make the
 	// offset 0 and adjust the paginationState accordingly
-	if _, ok := paramMap["limit"]; ok {
-		paramArgs := paramMap["limit"].paramArgs
-		offset, limit := paramArgs[0].(uint64), paramArgs[1].(uint64)
+	if pp := paramMap["limit"]; len(pp.args) == 2 {
+		offset, limit := pp.args[0].(uint64), pp.args[1].(uint64)
 		if offset >= total_entries {
-			// We're out of bounds, change paramArgs[0]
+			// We're out of bounds, change args[0]
 			// (offset) to 0, and paginationState["page"]
 			// to 1. We also need explicitly set per_page,
 			// because otherwise backbone-paginator will
 			// reset it incorrectly
-			paramArgs[0] = 0
+			pp.args[0] = 0
 			paginationState["page"] = 1
 			paginationState["per_page"] = limit
 		}
 	}
 
-	rows, err := dbHandle.Query(sqlStatements["getMovies"]+paramMap["where"].paramString+paramMap["limit"].paramString,
-		append(paramMap["where"].paramArgs, paramMap["limit"].paramArgs...)...)
+	rows, err := dbHandle.Query(
+		fmt.Sprintf(sqlStatements["getMovies"], paramMap["where"].str, paramMap["order"].str, paramMap["limit"].str),
+		append(paramMap["where"].args, append(paramMap["order"].args, paramMap["limit"].args...)...)...)
 	if err != nil {
 		httpError(err)
 		return
