@@ -18,7 +18,7 @@ def test_handler_files(conf):
 # a query and figures out the right asserts to make. Given a page
 # argument, it will fetch all the pages up to and including that
 # page and test those, not just the specified page
-def param_query(params, conf, isOutOfBounds = False):
+def param_query(params, conf, isOutOfBounds=False):
     if 'q' in params:
         # The server runs a prefix match, so we add a star
         confmovies = [movie for movie in conf.movies if fnmatch.fnmatch(movie.name, params['q'] + '*')]
@@ -53,7 +53,7 @@ def param_query(params, conf, isOutOfBounds = False):
             assert 'per_page' in params
             allnames = []
             for i in range(params['page']):
-                strparams['page'] = str(i+1)
+                strparams['page'] = str(i + 1)
                 req = requests.get(conf.serveraddress + conf.handlers.movietable, params=strparams)
                 resp = req.json()
                 results.extend(resp[1])

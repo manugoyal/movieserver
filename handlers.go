@@ -111,8 +111,8 @@ func convertFilterString(filterString []byte) (result []byte) {
 }
 
 type paramPair struct {
-	str string
-	args   []interface{}
+	str  string
+	args []interface{}
 }
 
 // Looking at the form values in a request, it returns a map of SQL
@@ -135,13 +135,13 @@ func addQueryParams(r *http.Request) (map[string]paramPair, error) {
 		paramMap["where"] = paramPair{}
 	}
 
-	if sort_col, order := queryParams.Get("sort_by"), queryParams.Get("order"); len(sort_col + order) > 0 {
-		paramMap["order"] = paramPair{str:fmt.Sprintf(" ORDER BY `%s` %s", sort_col, order)}
+	if sort_col, order := queryParams.Get("sort_by"), queryParams.Get("order"); len(sort_col+order) > 0 {
+		paramMap["order"] = paramPair{str: fmt.Sprintf(" ORDER BY `%s` %s", sort_col, order)}
 	} else {
 		paramMap["order"] = paramPair{}
 	}
 
-	if page, per_page := queryParams.Get("page"), queryParams.Get("per_page"); len(page + per_page) > 0 {
+	if page, per_page := queryParams.Get("page"), queryParams.Get("per_page"); len(page+per_page) > 0 {
 		page_num, err := strconv.ParseUint(page, 10, 64)
 		if err != nil {
 			return nil, err

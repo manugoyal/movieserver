@@ -1,6 +1,4 @@
 import pytest
-import MySQLdb
-import MySQLdb.cursors
 import os.path
 import inspect
 import subprocess
@@ -15,8 +13,8 @@ def conf(request):
     srcpath = os.path.abspath(testdir + '/..')
     moviepath = testdir + '/moviedir'
     movies = [torndb.Row({'name': (dirpath + "/" + f)[len(moviepath) + 1:], 'downloads': 0})
-                              for dirpath, _, files in os.walk(moviepath)
-                              for f in files if len(f) > 0 and f[0] != '.']
+              for dirpath, _, files in os.walk(moviepath)
+              for f in files if len(f) > 0 and f[0] != '.']
     port = 10000
     db = torndb.Connection('127.0.0.1', 'movieserver', user="root")
     conf = torndb.Row({
