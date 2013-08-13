@@ -4,7 +4,8 @@ import requests
 import fnmatch
 import random
 
-random.seed()
+def setup_module():
+    random.seed()
 
 def test_handler_files(conf):
     rows = conf.db.query("SELECT path, name FROM movies WHERE present=TRUE")
