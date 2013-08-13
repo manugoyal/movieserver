@@ -103,7 +103,7 @@ func startupServer() {
 	}
 
 	glog.V(vLevel).Info("Installing handlers")
-	installHandlers()
+	setupHandlers()
 
 	glog.V(vLevel).Infof("Listening on port %d\n", *port)
 	if err := http.ListenAndServe(fmt.Sprintf(":%d", *port), nil); err != nil {

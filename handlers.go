@@ -18,12 +18,15 @@ specific language governing permissions and limitations under the License.
 package main
 
 import (
+	"archive/tar"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"github.com/golang/glog"
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 )
@@ -85,7 +88,7 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Failed to fetch home page", http.StatusInternalServerError)
 		}
 	} else {
-		http.ServeFile(w, r, *srcPath+"/"+r.URL.Path[len(mainURL):])
+		http.ServeFile(w, r, filepath.Join(*srcPath, r.URL.Path[len(mainURL):]))
 	}
 }
 
@@ -265,22 +268,68 @@ func movieTableHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Serves the movie identified by the given pathname, incrementing the
-// download count. *moviePath should not be in the url
+// download count. *moviePath should not be in the url. If it's a
+// directory, create a tar, skipping all the dotfiles and return that
 func movieHandler(w http.ResponseWriter, r *http.Request) {
-	filename := r.URL.Path[len(movieURL):]
-	filelocation := *moviePath + "/" + filename
+	filename := filepath.Clean(r.URL.Path[len(movieURL):])
+	filelocation := filepath.Join(*moviePath, filename)
 	glog.V(vLevel).Infof("Fetching file: %s", filelocation)
-	f, err := os.Open(filelocation)
+
+	httpError := func(err error, code int) {
+		glog.Errorf("Error in movie handler: %s", err)
+		http.Error(w, fmt.Sprintf("Could not serve file %s", filename), code)
+	}
+	fi, err := os.Stat(filelocation)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Could not serve file %s", filename), http.StatusNotFound)
+		httpError(err, http.StatusNotFound)
 		return
 	}
-	defer f.Close()
+	var (
+		rs        io.ReadSeeker
+		servename string
+	)
 
-	rs := io.ReadSeeker(f)
+	// If the named movie is a directory, it creates a tar out of
+	// the directory and serves that. Otherwise it opens the file
+	// and serves that.
+	if fi.IsDir() {
+		servename = filename + ".tar"
+		// Creates the tar in a bytes.Buffer, then serves it
+		// as a bytes.Reader
+		buf := new(bytes.Buffer)
+		tw := tar.NewWriter(buf)
+		// When the user uncompresses the tar, it should
+		// create the directory they selected to download, so
+		// we split off the last part of the directory to use
+		// as dirName in compressDir. If they're downloading
+		// the root directory, we split one off the *moviePath
+		var compressRoot, dirName string
+		if filename == "." {
+			compressRoot, dirName = filepath.Split(*moviePath)
+		} else {
+			compressRoot, dirName = filepath.Split(filename)
+			compressRoot = filepath.Join(*moviePath, compressRoot)
+		}
+		if err := compressDir(compressRoot, dirName, tw); err != nil {
+			httpError(err, http.StatusInternalServerError)
+			return
+		}
+		tw.Close()
+		rs = bytes.NewReader(buf.Bytes())
+	} else {
+		f, err := os.Open(filelocation)
+		if err != nil {
+			httpError(err, http.StatusNotFound)
+			return
+		}
+		defer f.Close()
+		rs, servename = f, filename
+		// We want to serve the file in a way that will force
+		// a download
+		w.Header().Set("Content-Type", "binary/octet-stream")
+	}
 
-	w.Header().Set("Content-Type", "binary/octet-stream")
-	http.ServeContent(w, r, filename, time.Time{}, rs)
+	http.ServeContent(w, r, servename, time.Time{}, rs)
 	glog.V(vLevel).Infof("Served file: %s", filelocation)
 
 	// Updates the download count, if no rows were affected, it
@@ -299,10 +348,11 @@ func movieHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func installHandlers() {
+func setupHandlers() error {
 	http.HandleFunc(mainURL, mainHandler)
 	http.HandleFunc(movieTableURL, movieTableHandler)
 	http.HandleFunc(movieURL, movieHandler)
 	http.HandleFunc(loginURL, loginHandler)
 	http.HandleFunc(checkAccessURL, checkAccessHandler)
+	return nil
 }
