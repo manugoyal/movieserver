@@ -12,9 +12,12 @@ def conf(request):
     testdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
     srcpath = os.path.abspath(testdir + '/..')
     moviepath = testdir + '/moviedir'
-    movies = [torndb.Row({'name': (dirpath + "/" + f)[len(moviepath) + 1:], 'downloads': 0})
-              for dirpath, _, files in os.walk(moviepath)
-              for f in files if len(f) > 0 and f[0] != '.']
+    # Movies includes all the non-dot directories and files plus the
+    # moviedir directory itself, as a '.'
+    movies = [torndb.Row({'name': os.path.join(dirpath, item)[len(moviepath) + 1:], 'downloads': 0})
+              for dirpath, dirnames, files in os.walk(moviepath)
+              for item in files + dirnames if len(item) > 0 and item[0] != '.']
+    movies += [torndb.Row({'name': '.', 'downloads': 0})]
     port = 10000
     db = torndb.Connection('127.0.0.1', 'movieserver', user="root")
     conf = torndb.Row({

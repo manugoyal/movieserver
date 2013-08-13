@@ -46,15 +46,32 @@ func indexMovies() error {
 	glog.V(vvLevel).Infof("Movie Indexer: indexing %s", *moviePath)
 
 	movieNames := make([]interface{}, 0)
-	// Walks through the moviePath directory and appends any movie
-	// file names to movieNames
+	// Walks through the moviePath directory and appends any paths
+	// (including directories), skipping dotfiles/dotdirectories
 	movieWalkFn := func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		if name := info.Name(); !info.IsDir() && name[0] != '.' {
-			movieNames = append(movieNames, path[len(*moviePath)+1:])
+
+		baseName := filepath.Base(path)
+		var displayName string
+		// If the base name of the file or directory starts
+		// with a ".", skip it, as long as it's not the root
+		// directory
+		switch {
+		case path == *moviePath:
+			displayName = "."
+		case baseName[0] == '.':
+			if info.IsDir() {
+				return filepath.SkipDir
+			} else {
+				return nil
+			}
+		default:
+			displayName = filepath.Clean(path[len(*moviePath)+1:])
 		}
+
+		movieNames = append(movieNames, displayName)
 		return nil
 	}
 
@@ -73,7 +90,7 @@ func indexMovies() error {
 		return err
 	}
 
-	if _, err = trans.Exec("UPDATE movies SET present=FALSE"); err != nil {
+	if _, err = trans.Exec("UPDATE movies SET present=FALSE WHERE present=TRUE"); err != nil {
 		trans.Rollback()
 		return err
 	}
