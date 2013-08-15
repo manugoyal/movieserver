@@ -72,6 +72,7 @@ var (
 	srcPath       = flag.String("src-path", srcdir(), "The path of the movieserver source directory")
 	moviePath     = flag.String("movie-path", "", "REQUIRED: The path of the movies directory")
 	port          = flag.Uint64("port", 8080, "The port to listen on")
+	mysqlPort     = flag.Uint64("mysql-port", 3306, "The port to connect to MySQL on")
 	refreshSchema = flag.Bool("refresh-schema", false, "If true, the server will drop and recreate the database schema")
 )
 

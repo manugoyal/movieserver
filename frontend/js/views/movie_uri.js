@@ -21,7 +21,6 @@ specific language governing permissions and limitations under the License.
  */
 
 define(['jquery', 'underscore', 'backgrid'], function($, _, Backgrid) {
-
   var MovieUri = Backgrid.UriCell.extend({
     render: function () {
       this.$el.empty();

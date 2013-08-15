@@ -19,8 +19,8 @@ specific language governing permissions and limitations under the License.
  * exports: MovieTableView
  */
 
-define(['jquery', 'backbone', 'collections/movie_pageable', 'backgrid', 'views/movie_uri', 'backgrid_paginator', 'backgrid_filter'],
-       function($, Backbone, PageableMovieCollection, Backgrid, MovieUri) {
+define(['backbone', 'collections/movie_pageable', 'backgrid', 'views/movie_uri', 'backgrid_paginator', 'backgrid_filter'],
+       function(Backbone, PageableMovieCollection, Backgrid, MovieUri) {
          var MovieTableView = Backbone.View.extend({
 
            columns: [

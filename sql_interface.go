@@ -24,6 +24,7 @@ import (
 	"github.com/golang/glog"
 	"io/ioutil"
 	"strings"
+	"fmt"
 )
 
 var (
@@ -34,7 +35,7 @@ var (
 // Creates a *DB handle with user root to the given database
 func connectRoot(dbName string) error {
 	var err error
-	dbHandle, err = sql.Open("mysql", "root@/"+dbName)
+	dbHandle, err = sql.Open("mysql", fmt.Sprintf("root@tcp(127.0.0.1:%d)/%s", *mysqlPort, dbName))
 	if err != nil {
 		return err
 	}

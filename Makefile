@@ -1,6 +1,7 @@
 syntax:
 	find . -name '*.go' -print0 | xargs -0 gofmt -w -l *.go
 	. venv/bin/activate; flake8 tests
+	find frontend/js -name '*.js' | grep -v 'libs/' | parallel jshint
 
 test:
 	. venv/bin/activate; py.test tests $(options)
