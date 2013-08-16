@@ -28,13 +28,16 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
+	"sync"
 	"time"
 )
 
 const (
 	mainURL        = "/main/"
-	movieTableURL  = mainURL + "table/movie"
+	tableURL       = mainURL + "table/"
 	movieURL       = mainURL + "movie/"
+	tableKeysURL   = mainURL + "tableKeys/"
 	loginURL       = "/"
 	checkAccessURL = "/checkAccess/"
 )
@@ -44,13 +47,34 @@ var (
 	// take a while, we store a mapping from where clauses to
 	// index size, so that we don't have to rerun the COUNT(*)
 	// when we're on the same movie set on a where clause we've
-	// already seen. Every time indexMovies run, it will clear
-	// this map, since it's creating a new movie set. This is
-	// okay, because this map is really only useful for very large
-	// movie sets, and reindexing very large indexes takes a
+	// already seen. Every time the movie indexer runs, it will
+	// clear this map, since it's creating a new movie set. This
+	// is okay, because this map is really only useful for very
+	// large movie sets, and reindexing very large indexes takes a
 	// while, so it would be cleared infrequently
-	fileIndexCount = make(map[string]uint64)
+	fileCount struct {
+		index map[string]uint64
+		// We need to control concurrent access to the fileCount map,
+		// since the movie indexer writes to it, and each table
+		// handler thread reads from it
+		lock sync.RWMutex
+	}
 )
+
+// Read locks the fileCount and reads the given key
+func fileCountRead(key string) (uint64, bool) {
+	fileCount.lock.RLock()
+	count, ok := fileCount.index[key]
+	fileCount.lock.RUnlock()
+	return count, ok
+}
+
+// Write locks the fileCount and writes the given key-value pair
+func fileCountWrite(key string, value uint64) {
+	fileCount.lock.Lock()
+	fileCount.index[key] = value
+	fileCount.lock.Unlock()
+}
 
 // Launches the login template when the user opens up http://[ip]:[port]/
 func loginHandler(w http.ResponseWriter, r *http.Request) {
@@ -92,6 +116,24 @@ func mainHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// Returns a json array of the moviePaths keys
+func tableKeysHandler(w http.ResponseWriter, r *http.Request) {
+	jsonResponse := make([]interface{}, 0, len(moviePaths))
+	for k, _ := range moviePaths {
+		jsonResponse = append(jsonResponse, k)
+	}
+
+	jsonData, err := json.Marshal(jsonResponse)
+	if err != nil {
+		glog.Error(err)
+		http.Error(w, "Failed to fetch table keys", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	fmt.Fprint(w, string(jsonData))
+}
+
 // Replaces * with % and ? with _, handling escaping correctly
 func convertFilterString(filterString []byte) (result []byte) {
 	result = make([]byte, len(filterString))
@@ -122,7 +164,7 @@ type paramPair struct {
 // clauses to a pair of the string of the clause and its query params.
 // So far it checks for q (a filter string), page and per_page
 // (paging info), and sort_by and order (sorting)
-func addQueryParams(r *http.Request) (map[string]paramPair, error) {
+func addQueryParams(r *http.Request, moviePath string) (map[string]paramPair, error) {
 	paramMap := make(map[string]paramPair)
 	queryParams := r.URL.Query()
 	// We implement searching via LIKE. REGEXP is too slow, since
@@ -133,9 +175,9 @@ func addQueryParams(r *http.Request) (map[string]paramPair, error) {
 	if filterString := queryParams.Get("q"); filterString != "" {
 		fixedString := string(convertFilterString([]byte(filterString))) + "%"
 		paramMap["where"] = paramPair{" AND path = ? AND name LIKE ?",
-			[]interface{}{*moviePath, fixedString}}
+			[]interface{}{moviePath, fixedString}}
 	} else {
-		paramMap["where"] = paramPair{}
+		paramMap["where"] = paramPair{" AND path = ?", []interface{}{moviePath}}
 	}
 
 	if sort_col, order := queryParams.Get("sort_by"), queryParams.Get("order"); len(sort_col+order) > 0 {
@@ -164,22 +206,33 @@ func addQueryParams(r *http.Request) (map[string]paramPair, error) {
 
 // Serves the movies and downloads that are present from the movie
 // table as a JSON object. It returns pagination settings for the
-// client side paginator in the JSON object as well.
-func movieTableHandler(w http.ResponseWriter, r *http.Request) {
-	// No committing any reindexes from the heartbeat in between
-	// queries here
-	heartbeatLocks.fileIndexLock.Lock()
-	defer heartbeatLocks.fileIndexLock.Unlock()
-
-	httpError := func(err error) {
-		glog.Errorf("Error in movieTable handler: %s", err)
-		http.Error(w, fmt.Sprint("Failed to fetch movie names"), http.StatusInternalServerError)
+// client side paginator object in the JSON as well. The first segment
+// in the url is the key of the movie path.
+func tableHandler(w http.ResponseWriter, r *http.Request) {
+	httpError := func(err error, code int) {
+		glog.Errorf("Error in table handler: %s", err)
+		http.Error(w, fmt.Sprint("Failed to fetch movie names"), code)
 	}
 
+	// It takes away any slashes from the key
+	moviePathKey := strings.Replace(r.URL.Path[len(tableURL):], "/", "", -1)
+	moviePath, ok := moviePaths[moviePathKey]
+	if !ok {
+		httpError(fmt.Errorf("Invalid key name: %s", moviePathKey), http.StatusBadRequest)
+		return
+	}
 	// Get any additional query params as a query string
-	paramMap, err := addQueryParams(r)
+	paramMap, err := addQueryParams(r, moviePath)
 	if err != nil {
-		httpError(err)
+		httpError(err, http.StatusInternalServerError)
+		return
+	}
+
+	// Performs the select queries under a repeatable-read
+	// transaction, so their results remain consistent
+	trans, err := dbHandle.Begin()
+	if err != nil {
+		httpError(err, http.StatusInternalServerError)
 		return
 	}
 
@@ -190,27 +243,21 @@ func movieTableHandler(w http.ResponseWriter, r *http.Request) {
 	// in paginationState to 1 and use a limit offset of 0
 	var total_entries uint64
 
-	// First we check if the count is already in the
-	// fileIndexCount map
-	var fileIndexKey string
-	if pp := paramMap["where"]; len(pp.args) == 2 {
-		fileIndexKey = pp.args[0].(string) + pp.args[1].(string)
-	}
-
-	if count, ok := fileIndexCount[fileIndexKey]; ok {
+	// First we check if the count is already in the fileCount
+	fileCountKey := fmt.Sprint(paramMap["where"].args)
+	if count, ok := fileCountRead(fileCountKey); ok {
 		total_entries = count
 	} else {
 		// We need to run a COUNT(*) query. We only need the
 		// WHERE param arg
 		glog.V(vvLevel).Info("Running COUNT(*) over the movie index")
-		countRow := dbHandle.QueryRow(fmt.Sprintf(sqlStatements["getMovieNum"], paramMap["where"].str),
-			paramMap["where"].args...)
+		countRow := trans.QueryRow(fmt.Sprintf(sqlStatements["getMovieNum"], paramMap["where"].str), paramMap["where"].args...)
 		if err := countRow.Scan(&total_entries); err != nil {
-			httpError(err)
+			httpError(err, http.StatusInternalServerError)
 			return
 		}
-		// Update fileIndexCount
-		fileIndexCount[fileIndexKey] = total_entries
+		// Update fileCount
+		fileCountWrite(fileCountKey, total_entries)
 	}
 
 	paginationState := map[string]interface{}{
@@ -232,11 +279,11 @@ func movieTableHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rows, err := dbHandle.Query(
+	rows, err := trans.Query(
 		fmt.Sprintf(sqlStatements["getMovies"], paramMap["where"].str, paramMap["order"].str, paramMap["limit"].str),
 		append(paramMap["where"].args, append(paramMap["order"].args, paramMap["limit"].args...)...)...)
 	if err != nil {
-		httpError(err)
+		httpError(err, http.StatusInternalServerError)
 		return
 	}
 
@@ -244,13 +291,18 @@ func movieTableHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var r movieRow
 		if err = rows.Scan(&r.Name, &r.Downloads); err != nil {
-			httpError(err)
+			httpError(err, http.StatusInternalServerError)
 			return
 		}
 		movies = append(movies, r)
 	}
 	if err = rows.Err(); err != nil {
-		httpError(err)
+		httpError(err, http.StatusInternalServerError)
+		return
+	}
+
+	if err := trans.Commit(); err != nil {
+		httpError(err, http.StatusInternalServerError)
 		return
 	}
 
@@ -259,7 +311,7 @@ func movieTableHandler(w http.ResponseWriter, r *http.Request) {
 	jsonResponse := []interface{}{paginationState, movies}
 	jsonData, err := json.Marshal(jsonResponse)
 	if err != nil {
-		httpError(err)
+		httpError(err, http.StatusInternalServerError)
 		return
 	}
 
@@ -268,17 +320,37 @@ func movieTableHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // Serves the movie identified by the given pathname, incrementing the
-// download count. *moviePath should not be in the url. If it's a
-// directory, create a tar, skipping all the dotfiles and return that
+// download count. The keyname of the path should be be the first
+// segment in the url, and the path of the file should be everything
+// after that. If it's a directory, we create a tar, skipping all the
+// dotfiles, and return that
 func movieHandler(w http.ResponseWriter, r *http.Request) {
-	filename := filepath.Clean(r.URL.Path[len(movieURL):])
-	filelocation := filepath.Join(*moviePath, filename)
-	glog.V(vLevel).Infof("Fetching file: %s", filelocation)
-
 	httpError := func(err error, code int) {
 		glog.Errorf("Error in movie handler: %s", err)
-		http.Error(w, fmt.Sprintf("Could not serve file %s", filename), code)
+		http.Error(w, fmt.Sprintf("Could not serve request %s", r.URL.Path), code)
 	}
+
+	rest := r.URL.Path[len(movieURL):]
+	var moviePathKey, filename string
+	if slashIndex := strings.Index(rest, "/"); slashIndex == -1 {
+		// The movie path key must be the last segment in the
+		// URL, and there's no trailing slash. Assumes the
+		// filename will be the directory named by moviePath
+		// itself
+		moviePathKey = rest
+		filename = filepath.Clean("")
+	} else {
+		moviePathKey = rest[:slashIndex]
+		filename = filepath.Clean(rest[len(moviePathKey)+1:])
+	}
+	moviePath, ok := moviePaths[moviePathKey]
+	if !ok {
+		httpError(fmt.Errorf("Could not find movie path key: %s", moviePathKey), http.StatusBadRequest)
+		return
+	}
+	filelocation := filepath.Join(moviePath, filename)
+	glog.V(vLevel).Infof("Fetching file: %s", filelocation)
+
 	fi, err := os.Stat(filelocation)
 	if err != nil {
 		httpError(err, http.StatusNotFound)
@@ -298,23 +370,12 @@ func movieHandler(w http.ResponseWriter, r *http.Request) {
 		// as a bytes.Reader
 		buf := new(bytes.Buffer)
 		tw := tar.NewWriter(buf)
-		// When the user uncompresses the tar, it should
-		// create the directory they selected to download, so
-		// we split off the last part of the directory to use
-		// as dirName in compressDir. If they're downloading
-		// the root directory, we split one off the *moviePath
-		var compressRoot, dirName string
-		if filename == "." {
-			compressRoot, dirName = filepath.Split(*moviePath)
-		} else {
-			compressRoot, dirName = filepath.Split(filename)
-			compressRoot = filepath.Join(*moviePath, compressRoot)
-		}
-		if err := compressDir(compressRoot, dirName, tw); err != nil {
+		if err := tarDir(filepath.Join(moviePath, filename), tw); err != nil {
 			httpError(err, http.StatusInternalServerError)
 			return
 		}
 		tw.Close()
+		w.Header().Set("Content-Type", "binary/octet-stream")
 		rs = bytes.NewReader(buf.Bytes())
 	} else {
 		f, err := os.Open(filelocation)
@@ -335,7 +396,7 @@ func movieHandler(w http.ResponseWriter, r *http.Request) {
 	// Updates the download count, if no rows were affected, it
 	// should have thrown the "could not serve file" error, so it
 	// panics here
-	res, err := dbHandle.Exec(sqlStatements["addDownload"], *moviePath, filename)
+	res, err := dbHandle.Exec(sqlStatements["addDownload"], moviePath, filename)
 	if err != nil {
 		glog.Errorf("Error updating download count for %s: %s", filename, err)
 	}
@@ -349,9 +410,11 @@ func movieHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func setupHandlers() error {
+	fileCount.index = make(map[string]uint64)
 	http.HandleFunc(mainURL, mainHandler)
-	http.HandleFunc(movieTableURL, movieTableHandler)
+	http.HandleFunc(tableURL, tableHandler)
 	http.HandleFunc(movieURL, movieHandler)
+	http.HandleFunc(tableKeysURL, tableKeysHandler)
 	http.HandleFunc(loginURL, loginHandler)
 	http.HandleFunc(checkAccessURL, checkAccessHandler)
 	return nil

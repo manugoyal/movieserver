@@ -91,16 +91,19 @@
     },
 
     /**
-       Renders a search form with a text box, optionally with a placeholder and
-       a preset value if supplied during initialization.
+       Renders a search form with a text box, optionally with a
+       placeholder and a preset value if supplied during
+       initialization. I made it restore the input text box to its
+       original value
     */
     render: function () {
+      var prevText = this.$("input[type=text]").val();
       this.$el.empty().append(this.template({
         name: this.name,
         placeholder: this.placeholder,
         value: this.value
       }));
-      this.delegateEvents();
+      this.$("input[type=text]").val(prevText);
       return this;
     }
 

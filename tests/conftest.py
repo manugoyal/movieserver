@@ -11,34 +11,48 @@ import torndb
 def conf(request):
     testdir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
     srcpath = os.path.abspath(testdir + '/..')
-    moviepath = testdir + '/moviedir'
-    # Movies includes all the non-dot directories and files plus the
-    # moviedir directory itself, as a '.'
-    movies = [torndb.Row({'name': os.path.join(dirpath, item)[len(moviepath) + 1:], 'downloads': 0})
-              for dirpath, dirnames, files in os.walk(moviepath)
-              for item in files + dirnames if len(item) > 0 and item[0] != '.']
-    movies += [torndb.Row({'name': '.', 'downloads': 0})]
+    paths = {'movies': os.path.join(testdir, 'moviedir'), 'another': os.path.join(testdir, 'moviedir/anotherdir')}
+    # Movies includes all the files and directories for each path,
+    # filtering out dotfiles/dotdirectories and symlinks
+    movies = {}
+    for tablekey, path in paths.iteritems():
+        namelist = []
+        for dirpath, _, files in os.walk(path):
+            reldir = os.path.relpath(dirpath, path)
+            if reldir == '.' or reldir[0] != '.':
+                namelist.append(torndb.Row({'name': reldir, 'downloads': 0}))
+            else:
+                # Skips the directory if it's a bad one
+                continue
+            for f in files:
+                abspath = os.path.join(dirpath, f)
+                if f[0] != '.' and not os.path.islink(abspath):
+                    namelist.append(torndb.Row({'name': os.path.relpath(abspath, path), 'downloads': 0}))
+        movies[tablekey] = namelist
     port = 10000
     db = torndb.Connection('127.0.0.1', 'movieserver', user="root")
     conf = torndb.Row({
         'srcpath': srcpath,
-        'moviepath': moviepath,
+        'paths': paths,
         'movies': movies,
         'port': port,
         'serveraddress': 'http://localhost:' + str(port),
         'db': db,
-        'handlers': torndb.Row({'main': '/main/', 'movietable': '/main/table/movie',
-                                'movie': '/main/movie/', 'login': '/',
-                                'checkAccess': '/checkAccess/'})
+        'handlers': torndb.Row({'main': '/main/', 'login': '/', 'checkAccess': '/checkAccess/', 'table': {},
+                                'movie': {}})
     })
+    for tableKey in paths.iterkeys():
+        conf['handlers']['table'][tableKey] = '/main/table/%s/' % tableKey
+        conf['handlers']['movie'][tableKey] = '/main/movie/%s/' % tableKey
 
     print 'Starting server on', conf.serveraddress
     proc = subprocess.Popen(['movieserver',
-                            '-v', '2',
-                            '-log_dir', testdir + '/logs',
-                            '-src-path', conf['srcpath'],
-                            '-movie-path', conf['moviepath'],
-                            '-port', str(port)])
+                             '-v', '2',
+                             '-log_dir', testdir + '/logs',
+                             '-src-path', conf['srcpath'],
+                             '-path', 'movies=' + conf.paths['movies'],
+                             '-path', 'another=' + conf.paths['another'],
+                             '-port', str(port)])
     conf.proc = proc
     time.sleep(5)
 

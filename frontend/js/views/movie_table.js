@@ -19,68 +19,133 @@ specific language governing permissions and limitations under the License.
  * exports: MovieTableView
  */
 
-define(['backbone', 'collections/movie_pageable', 'backgrid', 'views/movie_uri', 'backgrid_paginator', 'backgrid_filter'],
-       function(Backbone, PageableMovieCollection, Backgrid, MovieUri) {
+define(['jquery', 'underscore', 'backbone', 'collections/movie_pageable', 'backgrid', 'views/movie_uri', 'backgrid_paginator', 'backgrid_filter'],
+       function($, _, Backbone, PageableMovieCollection, Backgrid, MovieUri) {
          var MovieTableView = Backbone.View.extend({
 
-           columns: [
-             {
-               name: "name",
-               label: "Movie",
-               editable: false,
-               cell: MovieUri
-             },
-             {
-               name: "downloads",
-               label: "Downloads",
-               editable: false,
-               cell: "integer"
-             }
-           ],
+           templates: {
+             tableSwitcher: _.template('<li><a href="#"><%= tableName %></a></li>')
+           },
+
+           columns: function(tableName) {
+             return [
+               {
+                 name: "name",
+                 label: "Movie",
+                 editable: false,
+                 cell: MovieUri(tableName)
+               },
+               {
+                 name: "downloads",
+                 label: "Downloads",
+                 editable: false,
+                 cell: "integer"
+               }
+             ];
+           },
 
            events: {
              'click #refreshButton': "_on_refreshbutton"
            },
 
-           initialize: function() {
-             // Create the grid, paginator, and filter for the movies
-             // table. Attach them to the correct places in the DOM
+           tables: {},
+           currentTable: null,
 
-             this.grid = new Backgrid.Grid({
-               columns: this.columns,
-               collection: new PageableMovieCollection()
-             });
-             this.$('#tableBox').append(this.grid.$el);
+           initialize: function(options) {
+             // Create the grid, paginator, and filter for each of the
+             // movie tables. Attach the current one to the correct
+             // places in the DOM
 
-             this.paginator = new Backgrid.Extension.Paginator({
-               collection: this.grid.collection
-             });
-             this.$('#paginatorBox').append(this.paginator.$el);
+             if (options.tableKeys.length === 0) {
+               alert("Recieved no tables from server");
+               return;
+             }
+             // Adds a clickable button for each collection, that
+             // changes the currentTable to the named one
+             _.each(options.tableKeys, _.bind(
+               function(tableName) {
+                 var switchButton = $(this.templates.tableSwitcher({ tableName: _.capitalize(tableName) }));
+                 switchButton.on('click', _.partial(
+                   function(outerThis) {
+                     $('#tableKeysBox').children('li').removeClass('active');
+                     $(this).addClass('active');
+                     outerThis.currentTable = outerThis.tables[tableName];
+                     outerThis.redraw();
+                     outerThis.refresh();
+                   }, this));
+                 $('#tableKeysBox').append(switchButton);
+               }, this));
+             $('#tableKeysBox').children('li:first-child').addClass('active');
 
-             this.filter = new Backgrid.Extension.ServerSideFilter({
-               collection: this.grid.collection,
-               placeholder: "Filter by name",
-               fields: ['Name']
-             });
-             this.$('#filterBox').append(this.filter.$el);
+             // Creates the grid, paginator, and filter for each
+             // collection
+             _.each(options.tableKeys, _.bind(
+               function(tableName) {
+                 var grid = new Backgrid.Grid({
+                   columns: this.columns(tableName),
+                   collection: new PageableMovieCollection([], { url: 'table/'+tableName })
+                 });
+                 var paginator = new Backgrid.Extension.Paginator({
+                   collection: grid.collection
+                 });
+                 var filter = new Backgrid.Extension.ServerSideFilter({
+                   collection: grid.collection,
+                   placeholder: "Filter by name"
+                 });
 
+                 this.tables[tableName] = {
+                   grid: grid,
+                   paginator: paginator,
+                   filter: filter
+                 };
+
+                 this.$('#tableBox').append(grid.$el);
+                 this.$('#paginatorBox').append(paginator.$el);
+                 this.$('#filterBox').append(filter.$el);
+               }, this));
+
+             this.currentTable = this.tables[options.tableKeys[0]];
+             this.redraw();
              this.refresh();
            },
 
+           redraw: function() {
+             // Hides any elements in the needed DOM position and
+             // shows the elements from the current table
+
+             this.$('#tableBox').children().hide();
+             this.$('#paginatorBox').children().hide();
+             this.$('#filterBox').children().hide();
+
+             this.currentTable.grid.$el.show();
+             this.currentTable.paginator.$el.show();
+             this.currentTable.filter.$el.show();
+           },
+
            refresh: function() {
-             this.grid.collection.fetch({reset: true});
+             // Re-fetches the current table's info
+             this.currentTable.grid.collection.fetch({
+               reset: true,
+               error: function() {
+                 alert("Failed to fetch table");
+               },
+               success: _.bind(
+                 function() {
+                   this.render();
+                 }, this)
+             });
            },
 
            _on_refreshbutton: function() {
              // Goes back to page one before refreshing
-             this.grid.collection.state.currentPage = 1;
+             this.currentTable.grid.collection.state.currentPage = 1;
              this.refresh();
            },
 
            render: function() {
-             this.grid.render();
-             this.paginator.render();
-             this.filter.render();
+             this.currentTable.grid.render();
+             this.currentTable.paginator.render();
+             this.currentTable.filter.render();
            }
 
          });

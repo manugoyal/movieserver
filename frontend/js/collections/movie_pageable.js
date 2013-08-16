@@ -22,15 +22,9 @@ define(['backbone', 'backbone_pageable'],
        function(Backbone) {
          var PageableCollection = require('backbone_pageable');
          var PageableMovieCollection = PageableCollection.extend({
-
            model: Backbone.Model,
-
-           url: 'table/movie',
-
            mode: "server",
-
            state: { pageSize: 15 }
-
          });
 
          return PageableMovieCollection;
