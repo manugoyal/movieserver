@@ -142,7 +142,7 @@ func cleanupServer() {
 
 func main() {
 	// Adds moviePaths as an argument
-	flag.Var(&moviePaths, "path", "Add a path to serve (Specify as a key-value pair [name]=[path]")
+	flag.Var(&moviePaths, "path", "Add a path to serve (Specify as a key-value pair [name]=[path])")
 	// Sets some defaults and parses the flags
 	flag.Lookup("v").Value.Set("1")
 	flag.Lookup("v").DefValue = "1"
