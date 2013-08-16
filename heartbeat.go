@@ -30,89 +30,54 @@ const (
 )
 
 var (
-	killTask       = make(chan bool, numTasks)
-	heartbeatWG    sync.WaitGroup
-	heartbeatLocks struct {
-		// When executing separate select queries over the
-		// movie entries, we sometimes don't want the size to
-		// change in between queries
-		fileIndexLock sync.Mutex
-	}
+	killTask    = make(chan bool, numTasks)
+	heartbeatWG sync.WaitGroup
 )
 
 // Reindexes the movies directory, setting not present to any movie
 // that isn't in the current list, and adding any new movies
 func indexMovies() error {
-	glog.V(vvLevel).Infof("Movie Indexer: indexing %s", *moviePath)
-
-	movieNames := make([]interface{}, 0)
-	// Walks through the moviePath directory and appends any paths
-	// (including directories), skipping dotfiles/dotdirectories
-	movieWalkFn := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		baseName := filepath.Base(path)
-		var displayName string
-		// If the base name of the file or directory starts
-		// with a ".", skip it, as long as it's not the root
-		// directory
-		switch {
-		case path == *moviePath:
-			displayName = "."
-		case baseName[0] == '.':
-			if info.IsDir() {
-				return filepath.SkipDir
-			} else {
-				return nil
-			}
-		default:
-			displayName = filepath.Clean(path[len(*moviePath)+1:])
-		}
-
-		movieNames = append(movieNames, displayName)
-		return nil
-	}
-
-	err := filepath.Walk(*moviePath, movieWalkFn)
-	if err != nil {
-		return err
-	}
-
-	// Sets all movies to non-present, then adds all the movies in
-	// moviePath, which should also set existing movies back to
+	// Sets all movies to non-present, then adds all the indexed
+	// movies, which should also set existing movies back to
 	// present=TRUE. It does this in one transaction, so it
 	// doesn't screw up current the present table count
-
 	trans, err := dbHandle.Begin()
 	if err != nil {
 		return err
 	}
-
 	if _, err = trans.Exec("UPDATE movies SET present=FALSE WHERE present=TRUE"); err != nil {
 		trans.Rollback()
 		return err
 	}
 
-	// Adds all the movies in movieNames, existing movies should
-	// get set to present=True
-	for _, name := range movieNames {
-		if _, err = trans.Exec(sqlStatements["newMovie"], *moviePath, name); err != nil {
-			trans.Rollback()
-			return err
+	for _, moviePath := range moviePaths {
+		glog.V(vvLevel).Infof("Movie Indexer: indexing %s", moviePath)
+		fileChan := make(chan filePair)
+		go walkDir(moviePath, fileChan, func(fp filePair) bool {
+			if (fp.path != moviePath && filepath.Base(fp.path)[0] == '.') ||
+				fp.fi.Mode()&os.ModeSymlink > 0 {
+				return false
+			}
+			return true
+		})
+		for fp := range fileChan {
+			relpath, err := filepath.Rel(moviePath, fp.path)
+			if err != nil {
+				return err
+			}
+			if _, err = trans.Exec(sqlStatements["newMovie"], moviePath, relpath); err != nil {
+				trans.Rollback()
+				return err
+			}
 		}
 	}
-
-	// Takes the fileIndex lock when updating the movie entry set
-	heartbeatLocks.fileIndexLock.Lock()
-	defer heartbeatLocks.fileIndexLock.Unlock()
 	if err := trans.Commit(); err != nil {
 		return err
 	}
-	// Clears the fileIndexCount
-	fileIndexCount = make(map[string]uint64)
-
+	// Clears the fileCount
+	fileCount.lock.Lock()
+	fileCount.index = make(map[string]uint64)
+	fileCount.lock.Unlock()
 	return nil
 }
 

@@ -20,11 +20,11 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang/glog"
 	"io/ioutil"
 	"strings"
-	"fmt"
 )
 
 var (
@@ -32,10 +32,12 @@ var (
 	sqlStatements = make(map[string]string)
 )
 
-// Creates a *DB handle with user root to the given database
+// Creates a *DB handle with user root to the given database. It sets
+// the transaction level to REPEATABLE-READ, so that reads within the
+// same transaction return consistent results.
 func connectRoot(dbName string) error {
 	var err error
-	dbHandle, err = sql.Open("mysql", fmt.Sprintf("root@tcp(127.0.0.1:%d)/%s", *mysqlPort, dbName))
+	dbHandle, err = sql.Open("mysql", fmt.Sprintf("root@tcp(127.0.0.1:%d)/%s?tx_isolation='REPEATABLE-READ'", *mysqlPort, dbName))
 	if err != nil {
 		return err
 	}
@@ -89,7 +91,7 @@ func setupSchema() error {
 	if err := dbHandle.Close(); err != nil {
 		return err
 	}
-	if err := connectRoot("movieserver"); err != nil {
+	if err := connectRoot(databaseName); err != nil {
 		return err
 	}
 	return nil
@@ -120,7 +122,7 @@ func buildSQLMap() {
 }
 
 // Sets up the schema, builds the query map, and sets all file entries
-// which aren't in the *moviePath to present=False. This has to be
+// which aren't in the moviePaths to present=False. This has to be
 // done before the indexer starts indexing, so that the server doesn't
 // accidentely return the wrong set of files to the client. Since it
 // only has to be done once, we don't need to put it in the heartbeat
@@ -128,7 +130,12 @@ func startupDB() error {
 	if err := setupSchema(); err != nil {
 		return err
 	}
-	if _, err := dbHandle.Exec("UPDATE movies SET present=FALSE WHERE path != ?", *moviePath); err != nil {
+	moviePathStr := strings.Repeat("?, ", len(moviePaths)-1) + "?"
+	moviePathArgs := make([]interface{}, 0, len(moviePaths))
+	for _, v := range moviePaths {
+		moviePathArgs = append(moviePathArgs, v)
+	}
+	if _, err := dbHandle.Exec(fmt.Sprintf("UPDATE movies SET present=FALSE WHERE path NOT IN (%s)", moviePathStr), moviePathArgs...); err != nil {
 		return err
 	}
 	buildSQLMap()

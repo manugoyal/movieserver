@@ -21,21 +21,23 @@ specific language governing permissions and limitations under the License.
  */
 
 define(['jquery', 'underscore', 'backgrid'], function($, _, Backgrid) {
-  var MovieUri = Backgrid.UriCell.extend({
-    render: function () {
-      this.$el.empty();
-      var formattedValue = this.formatter.fromRaw(this.model.get(this.column.get("name")));
-      var hrefFormatted = 'movie/' + formattedValue;
-      this.$el.append($("<a>", {
-        tabIndex: -1,
-        href: hrefFormatted,
-        title: formattedValue,
-        target: "_blank"
-      }).text(formattedValue));
-      this.delegateEvents();
-      return this;
-    }
-  });
+  var MovieUri = function(tableName) {
+    return Backgrid.UriCell.extend({
+      render: function () {
+        this.$el.empty();
+        var formattedValue = this.formatter.fromRaw(this.model.get(this.column.get("name")));
+        var hrefFormatted = 'movie/' + tableName + '/' + formattedValue;
+        this.$el.append($("<a>", {
+          tabIndex: -1,
+          href: hrefFormatted,
+          title: formattedValue,
+          target: "_blank"
+        }).text(formattedValue));
+        this.delegateEvents();
+        return this;
+      }
+    });
+  };
 
   return MovieUri;
 });

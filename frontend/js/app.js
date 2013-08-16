@@ -21,9 +21,8 @@ specific language governing permissions and limitations under the License.
 define(['views/movie_table'],
        function (MovieTableView) {
          var App = {
-           initialize: function () {
-             var movieTableView = new MovieTableView({ el: $('.container') });
-             movieTableView.render();
+           initialize: function (data) {
+             var movieTableView = new MovieTableView({ el: $('.container'), tableKeys: data});
            }
          };
          return App;

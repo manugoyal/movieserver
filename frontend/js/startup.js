@@ -19,6 +19,7 @@ requirejs.config({
   paths: {
     'jquery':                'libs/jquery',
     'underscore':            'libs/underscore',
+    'underscore.string':     'libs/underscore.string',
     'backbone':              'libs/backbone/backbone',
     'backbone_pageable':     'libs/backbone/backbone-pageable',
     'text':                  'libs/text',
@@ -30,7 +31,13 @@ requirejs.config({
 
   shim: {
     'jquery': { exports: '$' },
-    'underscore': { exports: '_' },
+    'underscore': {
+      deps: ['underscore.string'],
+      exports: '_',
+      init: function(UnderscoreString) {
+        _.mixin(UnderscoreString);
+      }
+    },
 
     'backbone': {
       deps: ['jquery', 'underscore'],
@@ -57,6 +64,8 @@ requirejs.config({
   }
 });
 
-requirejs(['app'], function(App) {
-  App.initialize();
+requirejs(['jquery', 'app'], function($, App) {
+  $.getJSON('tableKeys/', function(data) {
+    App.initialize(data);
+  });
 });

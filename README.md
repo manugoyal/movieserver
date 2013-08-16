@@ -43,7 +43,7 @@ Usage
 
 To run the server:
 
-    $ movieserver -movie-path [path-to-movies-directory]
+    $ movieserver -path [location-name]=[path-to-directory] [-path ...]
 
 There are a number of settings you can tweak via command line flags.
 To get a complete description of the settings, run

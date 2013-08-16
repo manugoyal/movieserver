@@ -25,6 +25,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 const (
@@ -32,7 +33,8 @@ const (
 	// be printed
 	vLevel = 1
 	// The info level for extra verbose statements
-	vvLevel = 2
+	vvLevel      = 2
+	databaseName = "movieserver"
 )
 
 // Looks through all the gopaths to find a possible location for the
@@ -68,9 +70,26 @@ func interruptHandler() {
 	}()
 }
 
+type moviePathMap map[string]string
+
+func (p *moviePathMap) String() string {
+	return fmt.Sprintf("%v", (map[string]string)(*p))
+}
+func (p *moviePathMap) Set(s string) error {
+	keyval := strings.Split(s, "=")
+	if len(keyval) != 2 {
+		return fmt.Errorf("Argument is not a proper key-value pair")
+	}
+	if strings.Index(keyval[0], "/") != -1 {
+		return fmt.Errorf("Key cannot include a slash")
+	}
+	(*p)[keyval[0]] = keyval[1]
+	return nil
+}
+
 var (
 	srcPath       = flag.String("src-path", srcdir(), "The path of the movieserver source directory")
-	moviePath     = flag.String("movie-path", "", "REQUIRED: The path of the movies directory")
+	moviePaths    = make(moviePathMap)
 	port          = flag.Uint64("port", 8080, "The port to listen on")
 	mysqlPort     = flag.Uint64("mysql-port", 3306, "The port to connect to MySQL on")
 	refreshSchema = flag.Bool("refresh-schema", false, "If true, the server will drop and recreate the database schema")
@@ -84,7 +103,9 @@ func startupServer() {
 	defer cleanupServer()
 
 	*srcPath = filepath.Clean(*srcPath)
-	*moviePath = filepath.Clean(*moviePath)
+	for k, _ := range moviePaths {
+		moviePaths[k] = filepath.Clean(moviePaths[k])
+	}
 
 	glog.V(vLevel).Info("Setting up SQL schema")
 	if err := startupDB(); err != nil {
@@ -116,11 +137,12 @@ func startupServer() {
 // Calls all the cleanup functions and flushes the log
 func cleanupServer() {
 	cleanupHeartbeat()
-	cleanupDB()
 	glog.Flush()
 }
 
 func main() {
+	// Adds moviePaths as an argument
+	flag.Var(&moviePaths, "path", "Add a path to serve (Specify as a key-value pair [name]=[path])")
 	// Sets some defaults and parses the flags
 	flag.Lookup("v").Value.Set("1")
 	flag.Lookup("v").DefValue = "1"
@@ -129,10 +151,10 @@ func main() {
 
 	flag.Parse()
 
-	// movie-path must be set
-	if *moviePath == "" {
+	// moviePaths must hove at least one value
+	if len(moviePaths) == 0 {
 		flag.PrintDefaults()
-		glog.Error("movie-path flag must be set")
+		glog.Error("There must be at least one path argument")
 		return
 	}
 
