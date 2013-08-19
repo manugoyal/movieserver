@@ -64,8 +64,7 @@ requirejs.config({
   }
 });
 
-requirejs(['jquery', 'app'], function($, App) {
-  $.getJSON('tableKeys/', function(data) {
-    App.initialize(data);
-  });
+requirejs(['jquery', 'underscore', 'app'], function($, _, App) {
+  setInterval(_.bind(App.poller, App), 1000);
+  App.initialize();
 });

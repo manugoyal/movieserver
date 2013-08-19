@@ -10,7 +10,7 @@ def setup_module():
 # Makes sure the server indexes all the files in the moviedir
 def test_handler_files(conf):
     for tableKey, path in conf.paths.iteritems():
-        rows = conf.db.query("SELECT path, name FROM movies WHERE present=TRUE and path = %s", path)
+        rows = conf.db.query("SELECT path, name FROM movies WHERE path = %s", path)
         badpaths = [r.path for r in rows if r.path != path]
         assert len(badpaths) == 0
         assert set([r.name for r in rows]) == set([movie.name for movie in conf.movies[tableKey]])
@@ -139,16 +139,17 @@ def test_orderby_downloads(conf):
     for tableKey, path in conf.paths.iteritems():
         downloads[tableKey] = [random.randint(0, 10000) for i in range(len(conf.movies[tableKey]))]
         for i in range(len(conf.movies[tableKey])):
-            conf.db.execute('UPDATE movies SET downloads=%s WHERE present=TRUE AND path=%s AND name=%s',
+            conf.db.execute('UPDATE movies SET downloads=%s WHERE path=%s AND name=%s',
                             downloads[tableKey][i], path, conf.movies[tableKey][i].name)
-            conf['movies'][tableKey][i]['downloads'] = downloads[tableKey][i]
+            conf.movies[tableKey][i]['downloads'] = downloads[tableKey][i]
 
     param_query({'sort_by': 'downloads', 'order': 'asc', 'page': 1, 'per_page': 1}, conf)
     param_query({'q': '*x', 'sort_by': 'downloads', 'order': 'desc', 'per_page': 1}, conf,
                 setPageOutOfBounds=True)
 
     # Clears the downlaods
-    conf.db.execute('UPDATE movies SET downloads=0 WHERE present=TRUE')
+    pathstr = "(" + ("%s" * len(conf.paths)) + ")"
+    conf.db.execute(("UPDATE movies SET downloads=0 WHERE path IN (%s)" % pathstr), *conf.paths.values())
     for tableKey in conf.paths.iterkeys():
         for i in range(len(conf.movies[tableKey])):
             conf.movies[tableKey][i]['downloads'] = 0

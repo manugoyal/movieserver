@@ -12,7 +12,8 @@ def setup_module():
 
 @pytest.fixture(autouse=True)
 def cleardownloads(request, conf):
-    conf.db.execute("UPDATE movies SET downloads=0 WHERE present=TRUE")
+    pathstr = ', '.join(["%s"] * len(conf.paths))
+    conf.db.execute(("UPDATE movies SET downloads=0 WHERE path IN (%s)" % pathstr), *conf.paths.values())
 
 def test_files(conf):
     for tableKey, path in conf.paths.iteritems():
@@ -28,10 +29,10 @@ def test_files(conf):
                 # It is encoded as a binary-stream, so req.content
                 # contains the raw bytes
                 assert filetext == req.content
-
         time.sleep(1)
+
         for i in range(len(downloads)):
-            rows = conf.db.query("SELECT name, downloads FROM movies WHERE present=TRUE AND path=%s AND name=%s", path, confmoviefiles[i].name)
+            rows = conf.db.query("SELECT downloads FROM movies WHERE path=%s AND name=%s", path, confmoviefiles[i].name)
             assert len(rows) == 1
             assert rows[0].downloads == downloads[i]
 
