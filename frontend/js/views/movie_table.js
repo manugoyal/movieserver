@@ -50,32 +50,37 @@ define(['jquery', 'underscore', 'backbone', 'collections/movie_pageable', 'backg
 
            tables: {},
            currentTable: null,
+           eventItems: [],
 
            initialize: function(options) {
              // Create the grid, paginator, and filter for each of the
              // movie tables. Attach the current one to the correct
              // places in the DOM
 
-             if (options.tableKeys.length === 0) {
-               alert("Recieved no tables from server");
-               return;
-             }
+             // Saves some of the common boxes
+             this.tableKeysBox = this.$('#tableKeysBox');
+             this.tableBox = this.$('#tableBox');
+             this.paginatorBox = this.$('#paginatorBox');
+             this.filterBox = this.$('#filterBox');
+             this.noDataAlert = this.$('#no-data-alert');
+
              // Adds a clickable button for each collection, that
              // changes the currentTable to the named one
              _.each(options.tableKeys, _.bind(
                function(tableName) {
                  var switchButton = $(this.templates.tableSwitcher({ tableName: _.capitalize(tableName) }));
-                 switchButton.on('click', _.partial(
+                 switchButton.on('click.handlers', _.partial(
                    function(outerThis) {
-                     $('#tableKeysBox').children('li').removeClass('active');
+                     outerThis.tableKeysBox.children('li').removeClass('active');
                      $(this).addClass('active');
                      outerThis.currentTable = outerThis.tables[tableName];
                      outerThis.redraw();
                      outerThis.refresh();
                    }, this));
-                 $('#tableKeysBox').append(switchButton);
+                 this.eventItems.push(switchButton);
+                 this.tableKeysBox.append(switchButton);
                }, this));
-             $('#tableKeysBox').children('li:first-child').addClass('active');
+             this.tableKeysBox.children('li:first-child').addClass('active');
 
              // Creates the grid, paginator, and filter for each
              // collection
@@ -99,9 +104,9 @@ define(['jquery', 'underscore', 'backbone', 'collections/movie_pageable', 'backg
                    filter: filter
                  };
 
-                 this.$('#tableBox').append(grid.$el);
-                 this.$('#paginatorBox').append(paginator.$el);
-                 this.$('#filterBox').append(filter.$el);
+                 this.tableBox.append(grid.$el);
+                 this.paginatorBox.append(paginator.$el);
+                 this.filterBox.append(filter.$el);
                }, this));
 
              this.currentTable = this.tables[options.tableKeys[0]];
@@ -109,29 +114,52 @@ define(['jquery', 'underscore', 'backbone', 'collections/movie_pageable', 'backg
              this.refresh();
            },
 
-           redraw: function() {
-             // Hides any elements in the needed DOM position and
-             // shows the elements from the current table
+           destroy: function() {
+             // Removes the .handlers handlers on all items in
+             // eventItems and empties the table from the DOM
+             _.each(this.eventItems, function(item) {
+               item.off('.handlers');
+             });
+             this.tableKeysBox.empty();
+             this.tableBox.empty();
+             this.paginatorBox.empty();
+             this.filterBox.empty();
+           },
 
-             this.$('#tableBox').children().hide();
-             this.$('#paginatorBox').children().hide();
-             this.$('#filterBox').children().hide();
+           // Hides any elements in the filter, table, and paginator DOM positions
+           hideEverything: function() {
+             this.filterBox.children().hide();
+             this.tableBox.children().hide();
+             this.paginatorBox.children().hide();
+           },
 
+           // Shows the elements of the current table
+           showCurrentTable: function() {
+             this.currentTable.filter.$el.show();
              this.currentTable.grid.$el.show();
              this.currentTable.paginator.$el.show();
-             this.currentTable.filter.$el.show();
+           },
+
+           redraw: function() {
+             this.hideEverything();
+             this.showCurrentTable();
            },
 
            refresh: function() {
              // Re-fetches the current table's info
              this.currentTable.grid.collection.fetch({
                reset: true,
-               error: function() {
-                 alert("Failed to fetch table");
-               },
                success: _.bind(
                  function() {
-                   this.render();
+                   if (this.currentTable.grid.collection.length === 0) {
+                     this.noDataAlert.show();
+                     this.hideEverything();
+                     _.bind(this.refresh, this)();
+                   } else {
+                     this.noDataAlert.hide();
+                     this.showCurrentTable();
+                     this.render();
+                   }
                  }, this)
              });
            },
