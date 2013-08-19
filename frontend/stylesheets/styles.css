@@ -36,3 +36,8 @@ body {
   border: 0px;
   background-color: transparent;
 }
+#no-data-alert,
+#no-connection-alert,
+#no-keys-alert {
+  display: none;
+}

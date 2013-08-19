@@ -119,7 +119,7 @@ func startupServer() {
 	}
 
 	glog.V(vLevel).Info("Fetching html templates")
-	if err := fetchTemplates("login", "index"); err != nil {
+	if err := fetchTemplates("login"); err != nil {
 		glog.Error(err)
 		return
 	}

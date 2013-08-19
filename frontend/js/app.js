@@ -18,11 +18,45 @@ specific language governing permissions and limitations under the License.
  * exports: App
  */
 
-define(['views/movie_table'],
-       function (MovieTableView) {
+define(['jquery', 'underscore', 'views/movie_table'],
+       function ($, _, MovieTableView) {
          var App = {
-           initialize: function (data) {
-             var movieTableView = new MovieTableView({ el: $('.container'), tableKeys: data});
+           offline: false,
+           movieTable: null,
+
+           poller: function() {
+             $.ajax({
+               url: '/',
+               success: _.bind(
+                 function() {
+                   if (this.offline) {
+                     this.offline = false;
+                     $('#no-connection-alert').hide();
+                     if (this.movieTable) {
+                       this.movieTable.destroy();
+                       this.initialize();
+                     }
+                   }
+                 }, this),
+               error: _.bind(
+                 function() {
+                   $('#no-connection-alert').show();
+                   this.offline = true;
+                   _.bind(this.poller, this)();
+                 }, this)
+             });
+           },
+
+           initialize: function () {
+             $.getJSON('tableKeys/', _.bind(function(data) {
+               if (data.length === 0) {
+                 $('#no-keys-alert').show();
+                 return;
+               } else {
+                 $('#no-keys-alert').hide();
+                 this.movieTable = new MovieTableView({ el: $('.container'), tableKeys: data});
+               }
+             }, this));
            }
          };
          return App;

@@ -100,42 +100,36 @@ func setupSchema() error {
 // Adds some predefined SQL statements to a map
 func buildSQLMap() {
 	// newMovie adds a movie to the movies table. If the movie is
-	// already there, it sets present to TRUE
-	sqlStatements["newMovie"] = "INSERT INTO movies(path, name) VALUES (?, ?) ON DUPLICATE KEY UPDATE present=TRUE"
+	// already there, it will throw a dup key error
+	sqlStatements["newMovie"] = "INSERT INTO movies(path, name) VALUES (?, ?)"
+
+	// deleteMovie deletes a movie from the table. If there is no
+	// movie, it won't do anything, but it will say that 0 rows
+	// were affected
+	sqlStatements["deleteMovie"] = "DELETE FROM movies where path=? and name=?"
+
 	// addDownload increments the number of downloads for an
 	// existing movie. If the movie isn't there, it won't throw an
 	// error, but it will say that 0 rows were affected.
 	sqlStatements["addDownload"] = "UPDATE movies SET downloads=downloads+1 WHERE path=? AND name=?"
 
 	// getMovies selects all the movie names and downloads from
-	// the movies table that are present. The three %s's are meant
-	// for additional WHERE clauses, ORDER BY, and LIMIT
-	sqlStatements["getMovies"] = "SELECT name, downloads FROM movies WHERE present = TRUE %s %s %s"
+	// the movies table that are in moviePaths paths. The three
+	// %s's are meant for WHERE clauses, ORDER BY, and LIMIT
+	sqlStatements["getMovies"] = "SELECT name, downloads FROM movies WHERE %s %s %s"
 
 	// getMovieNum is the same as getMovies except it's a COUNT(*)
 	// query. We don't need ORDER BY and LIMIT, though.
-	sqlStatements["getMovieNum"] = "SELECT COUNT(*) FROM movies WHERE present = TRUE %s"
+	sqlStatements["getMovieNum"] = "SELECT COUNT(*) FROM movies WHERE %s"
 
 	// getUserAndPassword selects the row that matches a given
 	// username-password combination
 	sqlStatements["getUserAndPassword"] = "SELECT user from login WHERE user = ? AND password = ?"
 }
 
-// Sets up the schema, builds the query map, and sets all file entries
-// which aren't in the moviePaths to present=False. This has to be
-// done before the indexer starts indexing, so that the server doesn't
-// accidentely return the wrong set of files to the client. Since it
-// only has to be done once, we don't need to put it in the heartbeat
+// Sets up the schema and builds the query map
 func startupDB() error {
 	if err := setupSchema(); err != nil {
-		return err
-	}
-	moviePathStr := strings.Repeat("?, ", len(moviePaths)-1) + "?"
-	moviePathArgs := make([]interface{}, 0, len(moviePaths))
-	for _, v := range moviePaths {
-		moviePathArgs = append(moviePathArgs, v)
-	}
-	if _, err := dbHandle.Exec(fmt.Sprintf("UPDATE movies SET present=FALSE WHERE path NOT IN (%s)", moviePathStr), moviePathArgs...); err != nil {
 		return err
 	}
 	buildSQLMap()

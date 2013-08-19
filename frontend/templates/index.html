@@ -31,6 +31,7 @@ specific language governing permissions and limitations under the License.
 
   <body>
     <div class="container">
+
       <div class="row">
         <nav class="navbar" role="navigation">
           <!-- Brand and toggle get grouped for better mobile display -->
@@ -56,6 +57,20 @@ specific language governing permissions and limitations under the License.
         <div id="paginatorBox" class="col-12 text-center">
         </div>
       </div>
+
+      <div class="row">
+        <div id="no-data-alert" class="alert alert-info">
+          Please wait while the server reindexes this folder...
+        </div>
+        <div id="no-keys-alert" class="alert alert-info">
+          Received no windows from the server. There is likely a
+          problem with the server.
+        </div>
+        <div id="no-connection-alert" class="alert alert-danger">
+          Lost connection to the server. Polling...
+        </div>
+      </div>
+
     </div>
   </body>
 </html>
