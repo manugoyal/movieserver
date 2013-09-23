@@ -20,6 +20,7 @@ package main
 import (
 	"archive/tar"
 	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"github.com/golang/glog"
@@ -316,16 +317,32 @@ func movieHandler(w http.ResponseWriter, r *http.Request) {
 	// and serves that.
 	if fi.IsDir() {
 		servename = filename + ".tar"
-		// Creates the tar in a bytes.Buffer, then serves it
-		// as a bytes.Reader
-		buf := new(bytes.Buffer)
-		tw := tar.NewWriter(buf)
+		// Creates the tar in a file called
+		// ".{crypto_random_string}.tar". It has to bound the
+		// random string in the printable character range, so
+		// that it is a valid file name.
+		randbuf := make([]byte, 64)
+		if _, err := rand.Read(randbuf); err != nil {
+			httpError(err, http.StatusInternalServerError)
+			return
+		}
+		// Given this range, this function has a 1/58^64
+		// chance of producing duplicate file strings and thus
+		// failing
+		servefilename := "." + string(bytes.Map(func(r rune) rune {return r % (123-65) + 65}, randbuf))
+		servefile, err := os.Create(servefilename)
+		if err != nil {
+			httpError(err, http.StatusInternalServerError)
+			return
+		}
+		defer os.Remove(servefilename)
+		tw := tar.NewWriter(servefile)
 		if err := tarDir(filepath.Join(moviePath, filename), tw); err != nil {
 			httpError(err, http.StatusInternalServerError)
 			return
 		}
 		tw.Close()
-		rs = bytes.NewReader(buf.Bytes())
+		rs = servefile
 	} else {
 		f, err := os.Open(filelocation)
 		if err != nil {
