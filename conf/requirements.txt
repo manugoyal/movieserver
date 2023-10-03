@@ -1,6 +1,6 @@
 MySQL-python==1.2.4
 py==1.4.15
 pytest==2.3.5
-requests==1.2.3
+requests==2.31.0
 torndb==0.1
 wsgiref==0.1.2
